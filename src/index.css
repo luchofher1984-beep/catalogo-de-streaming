@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@layer utilities {
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+}
+
+@keyframes floatUpFade {
+  0% {
+    transform: translateY(0) scale(0.8);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-80px) scale(1.2) rotate(6deg);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-180px) scale(1) rotate(-6deg);
+    opacity: 0;
+  }
+}
+
+.animate-floating-reaction {
+  animation: floatUpFade 2.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}

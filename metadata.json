@@ -1,0 +1,6 @@
+{
+  "name": "Catálogo de Streaming",
+  "description": "Catálogo estilo Netflix para compra de suscripciones y Panel de Administrador (Dashboard) para gestión completa de servicios de streaming, precios, stock y pedidos con Supabase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

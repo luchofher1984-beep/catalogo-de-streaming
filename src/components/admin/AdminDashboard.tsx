@@ -1,0 +1,336 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { ServicioStreaming, OrdenCompra, ConfiguracionSistema } from '../../types';
+import { AdminSidebar } from './AdminSidebar';
+import { AdminServicesTable } from './AdminServicesTable';
+import { AdminOrdersTable } from './AdminOrdersTable';
+import { AdminCustomersTable } from './AdminCustomersTable';
+import { AdminMetricsView } from './AdminMetricsView';
+import { AdminSettingsView } from './AdminSettingsView';
+import { AddServiceModal } from './AddServiceModal';
+import { EditServiceModal } from './EditServiceModal';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { LogoutModal } from './LogoutModal';
+import { AdminAllAccounts } from './AdminAllAccounts';
+
+
+// ✅ Importamos el servicio
+import { supabaseService } from '../../services/supabaseService';
+
+
+import {
+  Plus,
+  Menu,
+  Store,
+  RefreshCw,
+} from 'lucide-react';
+
+
+// ✅ Tipo AdminTab que coincide con tus nombres
+type AdminTabLocal = 
+  | 'catalogo'
+  | 'cuentas'
+  | 'pedidos'
+  | 'clientes'
+  | 'metricas'
+  | 'configuraciones';
+
+
+interface AdminDashboardProps {
+  servicios: ServicioStreaming[];
+  ordenes: OrdenCompra[];
+  onCrearServicio: (servicio: Omit<ServicioStreaming, 'id' | 'created_at' | 'ventas_count' | 'calificacion'>) => Promise<boolean>;
+  onEditarServicio: (id: string, updates: Partial<ServicioStreaming>) => Promise<boolean>;
+  onEliminarServicio: (id: string) => Promise<boolean>;
+  onActualizarStockRapido: (servicioId: string, nuevoStock: number) => void;
+  onIrATienda: () => void;
+  onVerServicioEnTienda: (servicio: ServicioStreaming) => void;
+}
+
+
+const AdminDashboard: React.FC<AdminDashboardProps> = ({
+  servicios,
+  ordenes,
+  onCrearServicio,
+  onEditarServicio,
+  onEliminarServicio,
+  onActualizarStockRapido,
+  onIrATienda,
+  onVerServicioEnTienda,
+}) => {
+  const [tabActiva, setTabActiva] = useState<AdminTabLocal>('catalogo');
+  const [isOpenMobileSidebar, setIsOpenMobileSidebar] = useState(false);
+  const [configuracion, setConfiguracion] = useState<ConfiguracionSistema | null>(null);
+  const [cargandoConfig, setCargandoConfig] = useState(true);
+
+  const [perfiles, setPerfiles] = useState<any[]>([]);
+  const [todasLasCuentas, setTodasLasCuentas] = useState<any[]>([]);
+
+
+  const cargarTodasLasCuentas = async () => {
+    console.log('🔄 Recargando lista completa de cuentas...');
+    const { data, error } = await supabaseService.getTodasLasCuentas();
+    if (error) {
+      console.error('❌ Error cargando cuentas:', error);
+    } else {
+      console.log('✅ Cuentas actualizadas:', data?.length || 0);
+      setTodasLasCuentas(data || []);
+    }
+  };
+
+
+  const cargarPerfiles = async () => {
+    console.log('🔄 Cargando perfiles de clientes...');
+    const { data, error } = await supabaseService.getClientes();
+    if (error) {
+      console.error('❌ Error cargando perfiles:', error);
+    } else {
+      console.log('✅ Perfiles cargados:', data?.length || 0);
+      setPerfiles(data || []);
+    }
+  };
+
+
+  useEffect(() => {
+    const cargarConfig = async () => {
+      console.log('🔄 Cargando configuración...');
+      const { data, error } = await supabaseService.getConfiguracion();
+      if (error) {
+        console.error('❌ Error cargando configuración:', error);
+      } else {
+        console.log('✅ Configuración cargada:', data);
+        setConfiguracion(data);
+      }
+      setCargandoConfig(false);
+    };
+    cargarConfig();
+  }, []);
+
+
+  useEffect(() => {
+    cargarTodasLasCuentas();
+    cargarPerfiles();
+  }, []);
+
+
+  const handleGuardarConfiguracion = async (config: Partial<ConfiguracionSistema>, imagenQR?: File): Promise<boolean> => {
+    const { success, data } = await supabaseService.guardarConfiguracion(config, imagenQR);
+    if (success && data) setConfiguracion(data);
+    return success;
+  };
+
+
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [servicioAEditar, setServicioAEditar] = useState<ServicioStreaming | null>(null);
+  const [servicioAEliminar, setServicioAEliminar] = useState<ServicioStreaming | null>(null);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+
+
+  // ✅ FUNCIÓN ELIMINAR ORDEN — LIBERA CUENTA + AUMENTA STOCK + ELIMINA ORDEN
+  const eliminarOrden = async (orden: any): Promise<boolean> => {
+    try {
+      console.log('🗑️ Eliminando orden:', orden.id);
+      console.log('📋 Datos de la orden → cuenta_id:', orden.cuenta_id, '| servicio_id:', orden.servicio_id);
+
+      // PASO 1: LIBERAR LA CUENTA → vuelve a DISPONIBLE
+      if (orden.cuenta_id) {
+        console.log('🔓 Liberando cuenta ID:', orden.cuenta_id);
+        const { error } = await supabaseService.liberarCuenta(orden.cuenta_id);
+        if (error) {
+          alert('❌ Error al liberar la cuenta:\n' + error.message);
+          return false;
+        }
+        console.log('✅ Cuenta liberada → ✅ LIBRE en "Todas las Cuentas"');
+      } else {
+        console.warn('⚠️ Esta orden NO tiene cuenta_id, no se pudo liberar la cuenta');
+      }
+
+      // PASO 2: AUMENTAR EL STOCK del servicio
+      if (orden.servicio_id) {
+        console.log('📦 Aumentando stock del servicio:', orden.servicio_id);
+        const { error } = await supabaseService.aumentarStockServicio(orden.servicio_id);
+        if (error) {
+          alert('❌ Error al aumentar el stock:\n' + error.message);
+          return false;
+        }
+        console.log('✅ Stock aumentado +1 → se refleja en el Catálogo');
+      } else {
+        console.warn('⚠️ Esta orden NO tiene servicio_id, no se pudo actualizar el stock');
+      }
+
+      // PASO 3: ELIMINAR LA ORDEN de la tabla
+      const { error: errorOrden } = await supabaseService.eliminarOrdenCompra(orden.id);
+      if (errorOrden) {
+        alert('❌ Error al eliminar la orden:\n' + errorOrden.message);
+        return false;
+      }
+      console.log('✅ Orden eliminada de la lista');
+
+      // ✅ MENSAJE DE ÉXITO
+      alert('✅ ¡ELIMINADO CORRECTAMENTE!\n\n' +
+            '✅ Cuenta → LIBRE (aparece en "Todas las Cuentas")\n' +
+            '✅ Stock → AUMENTÓ +1 en el Catálogo\n' +
+            '✅ Orden → ELIMINADA');
+
+      // 🔄 Recargamos TODO automáticamente
+      await cargarTodasLasCuentas();
+      return true;
+
+    } catch (err: any) {
+      console.error('❌ Error inesperado:', err);
+      alert('❌ Ocurrió un error inesperado:\n' + (err?.message || 'Error desconocido'));
+      return false;
+    }
+  };
+
+
+  const totalStock = useMemo(() => {
+    return todasLasCuentas.filter(c => 
+      (c.estado || '').trim().toLowerCase() === 'disponible' || 
+      c.estado === null || 
+      c.estado === ''
+    ).length;
+  }, [todasLasCuentas]);
+
+
+  const totalActivos = useMemo(() => {
+    const serviciosConStock = new Set(
+      todasLasCuentas.filter(c => 
+        (c.estado || '').trim().toLowerCase() === 'disponible' || 
+        c.estado === null || 
+        c.estado === ''
+      ).map(c => c.servicio_id)
+    );
+    return serviciosConStock.size;
+  }, [todasLasCuentas]);
+
+
+  const totalAgotados = useMemo(() => {
+    const serviciosConStock = new Set(
+      todasLasCuentas.filter(c => 
+        (c.estado || '').trim().toLowerCase() === 'disponible' || 
+        c.estado === null || 
+        c.estado === ''
+      ).map(c => c.servicio_id)
+    );
+    return servicios.length - serviciosConStock.size;
+  }, [servicios, todasLasCuentas]);
+
+
+  return (
+    <div className="min-h-screen bg-[#101010] text-white flex flex-col lg:flex-row antialiased font-sans overflow-x-hidden">
+      <AdminSidebar
+        tabActiva={tabActiva as any}
+        onCambiarTab={(tab: any) => {
+          console.log('👉 Cambiando a pestaña:', tab);
+          setTabActiva(tab);
+        }}
+        totalServicios={servicios.length}
+        totalPedidos={ordenes.length}
+        onCerrarSesion={() => setIsLogoutModalOpen(true)}
+        onIrATienda={onIrATienda}
+        isOpenMobile={isOpenMobileSidebar}
+        onCloseMobile={() => setIsOpenMobileSidebar(false)}
+      />
+
+
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden">
+        <header className="sticky top-0 z-30 bg-[#141414]/95 backdrop-blur-md border-b border-zinc-800 px-4 sm:px-8 py-3 sm:py-4 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsOpenMobileSidebar(true)}
+              className="p-2 rounded-xl bg-zinc-800 text-zinc-300 hover:text-white lg:hidden"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div>
+              <span className="text-xs font-bold text-red-500 uppercase tracking-widest">Panel de Administrador</span>
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-1">
+                {tabActiva === 'catalogo' && 'Catálogo de Servicios'}
+                {tabActiva === 'cuentas' && 'Todas las Cuentas'}
+                {tabActiva === 'pedidos' && 'Pedidos de Clientes'}
+                {tabActiva === 'clientes' && 'Gestión de Clientes'}
+                {tabActiva === 'metricas' && 'Métricas & Finanzas'}
+                {tabActiva === 'configuraciones' && 'Configuraciones del Sistema'}
+              </h1>
+            </div>
+          </div>
+        </header>
+
+
+        <main className="flex-1 p-4 sm:p-8 space-y-6 max-w-7xl w-full mx-auto">
+          {tabActiva !== 'configuraciones' && tabActiva !== 'cuentas' && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-[#181818] p-5 rounded-2xl border border-zinc-800">
+                <span className="text-xs text-zinc-400 font-bold uppercase">Total Servicios</span>
+                <h3 className="text-2xl font-black text-white mt-1">{servicios.length}</h3>
+              </div>
+              <div className="bg-[#181818] p-5 rounded-2xl border border-zinc-800">
+                <span className="text-xs text-zinc-400 font-bold uppercase">Servicios Activos</span>
+                <h3 className="text-2xl font-black text-emerald-400 mt-1">{totalActivos}</h3>
+              </div>
+              <div className="bg-[#181818] p-5 rounded-2xl border border-zinc-800">
+                <span className="text-xs text-zinc-400 font-bold uppercase">Servicios Agotados</span>
+                <h3 className="text-2xl font-black text-rose-400 mt-1">{totalAgotados}</h3>
+              </div>
+              <div className="bg-[#181818] p-5 rounded-2xl border border-zinc-800">
+                <span className="text-xs text-zinc-400 font-bold uppercase">Stock Total</span>
+                <h3 className="text-2xl font-black text-white mt-1">{totalStock}</h3>
+              </div>
+            </div>
+          )}
+
+
+          {tabActiva === 'catalogo' && <AdminServicesTable 
+            servicios={servicios} 
+            todasLasCuentas={todasLasCuentas}
+            onRecargarTodasCuentas={cargarTodasLasCuentas}
+            onEditarServicio={setServicioAEditar} 
+            onEliminarServicio={setServicioAEliminar} 
+            onActualizarStockRapido={onActualizarStockRapido} 
+            onAbrirModalNuevoServicio={() => setIsAddModalOpen(true)} 
+            onVerServicioEnTienda={onVerServicioEnTienda} 
+          />}
+          
+          {/* ✅ TODAS LAS CUENTAS */}
+          {tabActiva === 'cuentas' && <AdminAllAccounts />}
+          
+          {/* ✅ PEDIDOS — CON FUNCIÓN ELIMINAR CONECTADA */}
+          {tabActiva === 'pedidos' && (
+            <AdminOrdersTable 
+              ordenes={ordenes} 
+              perfiles={perfiles} 
+              onEliminarOrden={eliminarOrden}
+            />
+          )}
+
+
+          {tabActiva === 'clientes' && <AdminCustomersTable />}
+          {tabActiva === 'metricas' && <AdminMetricsView servicios={servicios} ordenes={ordenes} />}
+          
+          {tabActiva === 'configuraciones' && (
+            <div>
+              {cargandoConfig ? (
+                <div className="flex items-center justify-center py-20">
+                  <RefreshCw className="w-8 h-8 text-red-500 animate-spin" />
+                  <span className="ml-3 text-zinc-400">Cargando configuración...</span>
+                </div>
+              ) : (
+                <AdminSettingsView configuracion={configuracion} onGuardarConfiguracion={handleGuardarConfiguracion} />
+              )}
+            </div>
+          )}
+        </main>
+      </div>
+
+
+      <AddServiceModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onCrearServicio={onCrearServicio} />
+      <EditServiceModal servicio={servicioAEditar} isOpen={!!servicioAEditar} onClose={() => setServicioAEditar(null)} onGuardarCambios={onEditarServicio} />
+      <DeleteConfirmModal servicio={servicioAEliminar} isOpen={!!servicioAEliminar} onClose={() => setServicioAEliminar(null)} onConfirmarEliminar={onEliminarServicio} />
+      <LogoutModal isOpen={isLogoutModalOpen} onClose={() => setIsLogoutModalOpen(false)} onConfirmarLogout={() => { setIsLogoutModalOpen(false); onIrATienda(); }} />
+    </div>
+  );
+};
+
+
+// ✅ EXPORTACIÓN
+export default AdminDashboard;
