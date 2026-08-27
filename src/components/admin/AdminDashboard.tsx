@@ -125,7 +125,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
 
-  // ✅ FUNCIÓN ELIMINAR ORDEN — LIBERA CUENTA + AUMENTA STOCK + ELIMINA ORDEN
+  // ✅ FUNCIÓN ELIMINAR ORDEN — SIN VENTANA DE ÉXITO
   const eliminarOrden = async (orden: any): Promise<boolean> => {
     try {
       console.log('🗑️ Eliminando orden:', orden.id);
@@ -165,13 +165,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
       console.log('✅ Orden eliminada de la lista');
 
-      // ✅ MENSAJE DE ÉXITO
-      alert('✅ ¡ELIMINADO CORRECTAMENTE!\n\n' +
-            '✅ Cuenta → LIBRE (aparece en "Todas las Cuentas")\n' +
-            '✅ Stock → AUMENTÓ +1 en el Catálogo\n' +
-            '✅ Orden → ELIMINADA');
-
-      // 🔄 Recargamos TODO automáticamente
+      // ✅ RECARGAMOS TODO — ❌ SIN VENTANA DE ÉXITO
       await cargarTodasLasCuentas();
       return true;
 
@@ -232,7 +226,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         onCloseMobile={() => setIsOpenMobileSidebar(false)}
       />
 
-
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden">
         <header className="sticky top-0 z-30 bg-[#141414]/95 backdrop-blur-md border-b border-zinc-800 px-4 sm:px-8 py-3 sm:py-4 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3">
@@ -256,7 +249,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </header>
 
-
         <main className="flex-1 p-4 sm:p-8 space-y-6 max-w-7xl w-full mx-auto">
           {tabActiva !== 'configuraciones' && tabActiva !== 'cuentas' && (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -278,7 +270,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
           )}
-
 
           {tabActiva === 'catalogo' && <AdminServicesTable 
             servicios={servicios} 
@@ -303,7 +294,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             />
           )}
 
-
           {tabActiva === 'clientes' && <AdminCustomersTable />}
           {tabActiva === 'metricas' && <AdminMetricsView servicios={servicios} ordenes={ordenes} />}
           
@@ -321,7 +311,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           )}
         </main>
       </div>
-
 
       <AddServiceModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onCrearServicio={onCrearServicio} />
       <EditServiceModal servicio={servicioAEditar} isOpen={!!servicioAEditar} onClose={() => setServicioAEditar(null)} onGuardarCambios={onEditarServicio} />

@@ -2,13 +2,16 @@ import React, { useState } from 'react';
 import { supabase } from '../services/supabaseService';
 import { Eye, EyeOff } from 'lucide-react';
 
+
 const esCorreoValido = (correo: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo);
+
 
 interface AuthModalProps {
   onClose: () => void;
   onSuccess: (user: any) => void;
   initialView?: 'login' | 'register';
 }
+
 
 export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onSuccess, initialView = 'login' }) => {
   const [nombre, setNombre] = useState('');
@@ -20,6 +23,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onSuccess, initia
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+
   const handleTelefonoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const valor = e.target.value;
     if (valor.startsWith('+591 ')) {
@@ -29,9 +33,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onSuccess, initia
     }
   };
 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
 
     // ✅ Validación local antes de llamar a Supabase
     if (!esCorreoValido(email)) {
@@ -39,7 +45,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onSuccess, initia
       return;
     }
 
+
     setLoading(true);
+
 
     try {
       if (isLogin) {
@@ -57,6 +65,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onSuccess, initia
               id: data.user.id,
               nombre: nombre || 'Sin nombre',
               correo: email,
+              contrasena: password, // ✅ ¡NUEVO! GUARDA LA CONTRASEÑA AUTOMÁTICAMENTE
               telefono: telefono,
               estado: 'activo',
               total_gastado: 0,
@@ -64,9 +73,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onSuccess, initia
             }
           ]);
 
+
           if (profileError) {
             console.error('Error al guardar el perfil:', profileError.message);
           }
+
 
           if (data.session) {
             onSuccess(data.user);
@@ -82,6 +93,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onSuccess, initia
       setLoading(false);
     }
   };
+
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
@@ -103,6 +115,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onSuccess, initia
               <input type="text" required className="w-full bg-[#2b2b2b] text-white px-4 py-3 rounded outline-none focus:ring-2 focus:ring-red-600 transition" value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej. Juan Pérez" />
             </div>
           )}
+
 
           <div>
             <label className="text-gray-400 text-sm block mb-1">Correo Electrónico</label>

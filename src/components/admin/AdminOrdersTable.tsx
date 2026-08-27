@@ -15,25 +15,26 @@ import {
   Trash2,
   MessageCircle,
   FileText,
+  CheckCircle2,
 } from 'lucide-react';
 
 
-// ✅ AGREGUÉ "perfiles" AQUÍ — ESTABA FALTANDO
 interface TablaOrdenesProps {
   ordenes: OrdenCompra[] | any[];
-  perfiles?: any[];                    // ✅ AGREGADO — ELIMINA EL ERROR
+  perfiles?: any[];
   onEliminarOrden?: (orden: any) => Promise<boolean>;
 }
 
 
 const AdminOrdersTable: React.FC<TablaOrdenesProps> = ({ 
   ordenes, 
-  perfiles = [],        // ✅ RECIBIMOS LOS PERFILES
+  perfiles = [],
   onEliminarOrden 
 }) => {
   const [busqueda, setBusqueda] = useState('');
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
   const [copiandoTodo, setCopiandoTodo] = useState<string | null>(null);
+  const [confirmacion, setConfirmacion] = useState<{mostrar: boolean; orden: any}>({mostrar: false, orden: null});
 
 
   // 🇧🇴 Formatear FECHA SOLA (sin hora)
@@ -113,31 +114,72 @@ const AdminOrdersTable: React.FC<TablaOrdenesProps> = ({
   };
 
 
-  // ✅ ELIMINAR ORDEN → LIBERA CUENTA + AUMENTA STOCK
-  const handleEliminar = async (orden: any) => {
-    if (!onEliminarOrden) {
-      alert('⚠️ La función de eliminar no está conectada. Revisa AdminDashboard.tsx');
+  // ✅ MOSTRAR VENTANA DE CONFIRMACIÓN
+  const mostrarConfirmarEliminar = (orden: any) => {
+    setConfirmacion({ mostrar: true, orden });
+  };
+
+
+  // ✅ CONFIRMAR Y ELIMINAR — SIN VENTANA DE ÉXITO
+  const confirmarEliminar = async () => {
+    if (!confirmacion.orden || !onEliminarOrden) {
+      setConfirmacion({ mostrar: false, orden: null });
       return;
     }
 
-    const confirmar = window.confirm(
-      '⚠️ ¿ELIMINAR ESTA ORDEN?\n\n' +
-      '✅ La cuenta VOLVERÁ a "Todas las Cuentas" → DISPONIBLE\n' +
-      '✅ El stock del servicio AUMENTARÁ automáticamente en el catálogo\n\n' +
-      '¿Deseas continuar?'
-    );
+    const ordenAEliminar = confirmacion.orden;
+    setConfirmacion({ mostrar: false, orden: null });
 
-    if (confirmar) {
-      const ok = await onEliminarOrden(orden);
-      if (ok) {
-        alert('✅ ¡ELIMINADO CORRECTAMENTE!\n\n✅ Cuenta liberada → aparece en "Todas las Cuentas"\n✅ Stock aumentado +1 en el catálogo');
-      }
-    }
+    // ✅ ELIMINAMOS — SIN MOSTRAR VENTANA DE ÉXITO
+    await onEliminarOrden(ordenAEliminar);
+  };
+
+
+  const cancelarEliminar = () => {
+    setConfirmacion({ mostrar: false, orden: null });
   };
 
 
   return (
     <div className="space-y-4">
+      {/* ✅ VENTANA DE CONFIRMACIÓN — SOLO ESTA APARECE */}
+      {confirmacion.mostrar && confirmacion.orden && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex items-center gap-2 mb-4">
+              <AlertCircle size={22} className="text-amber-400" />
+              <h3 className="text-lg font-bold text-white">¿ELIMINAR ESTA ORDEN?</h3>
+            </div>
+            <div className="space-y-2 mb-6">
+              <p className="flex items-center gap-2 text-emerald-400 text-sm">
+                <CheckCircle2 size={16} />
+                La cuenta VOLVERÁ a "Todas las Cuentas" → DISPONIBLE
+              </p>
+              <p className="flex items-center gap-2 text-emerald-400 text-sm">
+                <CheckCircle2 size={16} />
+                El stock del servicio AUMENTARÁ automáticamente en el catálogo
+              </p>
+            </div>
+            <p className="text-zinc-300 text-sm mb-6">¿Deseas continuar?</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={cancelarEliminar}
+                className="px-6 py-2.5 rounded-lg bg-zinc-700 text-zinc-200 hover:bg-zinc-600 font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarEliminar}
+                className="px-6 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium transition-colors"
+              >
+                Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
       {/* Buscador */}
       <div className="relative">
         <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
@@ -149,6 +191,7 @@ const AdminOrdersTable: React.FC<TablaOrdenesProps> = ({
           className="w-full pl-10 pr-4 py-2.5 bg-zinc-900 border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
         />
       </div>
+
 
       {/* Tabla */}
       <div className="overflow-x-auto rounded-lg border border-zinc-800">
@@ -234,7 +277,7 @@ const AdminOrdersTable: React.FC<TablaOrdenesProps> = ({
                       <div className="font-medium">{orden.servicio_nombre || 'Desconocido'}</div>
                     </td>
 
-                    {/* ✅ CREDENCIALES + BOTÓN COPIAR TODO */}
+                    {/* Credenciales + Botón Copiar Todo */}
                     <td className="px-2 py-2 text-xs">
                       <div className="space-y-0.5 mb-2">
                         <div className="flex items-center gap-1">
@@ -254,7 +297,6 @@ const AdminOrdersTable: React.FC<TablaOrdenesProps> = ({
                           <span className="text-orange-300">PIN: {pin}</span>
                         </div>
                       </div>
-                      {/* 🔘 UN SOLO BOTÓN: COPIAR TODO */}
                       <button
                         onClick={() => copiarTodo(orden)}
                         className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-950/50 text-emerald-400 hover:bg-emerald-900 rounded text-xs border border-emerald-800 transition"
@@ -268,7 +310,7 @@ const AdminOrdersTable: React.FC<TablaOrdenesProps> = ({
                       </button>
                     </td>
 
-                    {/* ✅ FECHA COMPRA — SOLO FECHA, SIN HORA */}
+                    {/* Fecha Compra — solo fecha */}
                     <td className="px-2 py-2 text-xs font-medium">
                       {formatearFechaSola(orden.creada_en || orden.fecha)}
                     </td>
@@ -295,11 +337,11 @@ const AdminOrdersTable: React.FC<TablaOrdenesProps> = ({
                       </span>
                     </td>
 
-                    {/* ✅ ACCIÓN — BOTÓN ELIMINAR */}
+                    {/* Acción — Botón Eliminar */}
                     <td className="px-2 py-2 text-center">
                       {onEliminarOrden ? (
                         <button
-                          onClick={() => handleEliminar(orden)}
+                          onClick={() => mostrarConfirmarEliminar(orden)}
                           className="inline-flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold border border-red-500 shadow-lg shadow-red-900/50 transition transform hover:scale-105"
                           title="🗑️ ELIMINAR → Liberar cuenta y aumentar stock"
                         >
@@ -322,5 +364,4 @@ const AdminOrdersTable: React.FC<TablaOrdenesProps> = ({
 };
 
 
-// ✅ Exportación correcta
 export { AdminOrdersTable };
