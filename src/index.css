@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+
 @layer utilities {
   /* Hide scrollbar for Chrome, Safari and Opera */
   .no-scrollbar::-webkit-scrollbar {
@@ -11,6 +12,7 @@
     scrollbar-width: none;  /* Firefox */
   }
 }
+
 
 @keyframes floatUpFade {
   0% {
@@ -26,6 +28,7 @@
     opacity: 0;
   }
 }
+
 
 .animate-floating-reaction {
   animation: floatUpFade 2.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
