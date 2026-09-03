@@ -1,7 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, ShieldAlert, ShieldCheck, Eye, Calendar, Trash2 } from 'lucide-react';
-
-
+import { Search, ShieldAlert, ShieldCheck, Calendar, Trash2, Gift, X, Key } from 'lucide-react';
 
 interface Cliente {
   id: string;
@@ -14,24 +12,48 @@ interface Cliente {
   total_gastado: number;
 }
 
-
-
-interface AdminCustomersTableProps {
-  onEliminarCliente?: (id: string) => Promise<boolean>;
+interface CuentaServicio {
+  id: string;
+  servicio_id: string;
+  usuario_correo: string;
+  contrasena: string;
+  perfil?: string;
+  pin?: string;
+  estado: 'disponible' | 'entregada';
 }
 
+interface ServicioStreaming {
+  id: string;
+  nombre: string;
+  logo_url?: string;
+  precio: number;
+  categoria_label?: string;
+}
 
+interface AdminCustomersTableProps {
+  servicios: ServicioStreaming[];
+  todasLasCuentas: CuentaServicio[];
+  onEliminarCliente?: (id: string) => Promise<boolean>;
+  onAsignarCuentaManual: (clienteId: string, cuentaId: string, servicioId: string) => Promise<boolean>;
+}
 
-export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({ onEliminarCliente }) => {
+export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
+  servicios,
+  todasLasCuentas,
+  onEliminarCliente,
+  onAsignarCuentaManual,
+}) => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'activo' | 'bloqueado'>('todos');
   const [confirmacion, setConfirmacion] = useState<{mostrar: boolean; cliente: Cliente | null}>({mostrar: false, cliente: null});
+  const [modalAsignarAbierto, setModalAsignarAbierto] = useState(false);
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
+  const [servicioSeleccionadoId, setServicioSeleccionadoId] = useState<string>('');
+  const [cuentaSeleccionadaId, setCuentaSeleccionadaId] = useState<string>('');
+  const [procesando, setProcesando] = useState(false);
 
-
-
-  // ✅ CARGAR CLIENTES — AHORA TRAE LA CONTRASEÑA
   const cargarClientes = async () => {
     try {
       setCargando(true);
@@ -45,15 +67,10 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({ onElim
     }
   };
 
-
-
   React.useEffect(() => {
     cargarClientes();
   }, []);
 
-
-
-  // ✅ FILTRAR CLIENTES
   const clientesFiltrados = useMemo(() => {
     return (clientes as any[]).filter((c) => {
       const termino = busqueda.toLowerCase().trim();
@@ -65,22 +82,50 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({ onElim
     });
   }, [clientes, busqueda, filtroEstado]);
 
+  const cuentasDisponibles = useMemo(() => {
+    if (!servicioSeleccionadoId) return [];
+    return todasLasCuentas.filter(
+      c => c.servicio_id === servicioSeleccionadoId && c.estado === 'disponible'
+    );
+  }, [servicioSeleccionadoId, todasLasCuentas]);
 
+  const servicioSeleccionado = servicios.find(s => s.id === servicioSeleccionadoId);
 
-  // ✅ MOSTRAR VENTANA DE CONFIRMACIÓN
+  const abrirModalAsignar = (cliente: Cliente) => {
+    setClienteSeleccionado(cliente);
+    setServicioSeleccionadoId('');
+    setCuentaSeleccionadaId('');
+    setModalAsignarAbierto(true);
+  };
+
+  // ═══════════════════════════════════════════════════════════
+  // ✅ SOLUCIÓN DEFINITIVA: agregué el ! aquí ↓
+  // ═══════════════════════════════════════════════════════════
+  const confirmarAsignacion = async () => {
+    if (!clienteSeleccionado || !cuentaSeleccionadaId || !servicioSeleccionadoId) return;
+    setProcesando(true);
+    const exito = await onAsignarCuentaManual!(
+      clienteSeleccionado.id,
+      cuentaSeleccionadaId,
+      servicioSeleccionadoId
+    );
+    setProcesando(false);
+    if (exito) {
+      alert(`✅ Cuenta asignada correctamente a ${clienteSeleccionado.nombre}`);
+      setModalAsignarAbierto(false);
+      await cargarClientes();
+    }
+  };
+
   const mostrarConfirmarEliminar = (cliente: Cliente) => {
     setConfirmacion({ mostrar: true, cliente });
   };
 
-
-
-  // ✅ CONFIRMAR Y ELIMINAR — ✅ ARREGLADO ✅
   const confirmarEliminar = async () => {
     if (!confirmacion.cliente) return;
     
     try {
       let exito = false;
-
       if (onEliminarCliente) {
         exito = await onEliminarCliente(confirmacion.cliente.id);
       } else {
@@ -88,18 +133,15 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({ onElim
         const resultado = await supabaseService.eliminarCliente(confirmacion.cliente.id);
         exito = resultado.success;
         
-        // ✅ MUESTRA EL ERROR REAL EN CONSOLA
         if (!exito) {
           console.error('❌ Error al eliminar:', resultado.error);
           alert('❌ Error: ' + (resultado.error?.message || 'No se pudo eliminar'));
         }
       }
-
       if (exito) {
         alert('✅ Cliente eliminado correctamente');
         await cargarClientes();
       }
-
     } catch (err: any) {
       console.error('❌ Excepción al eliminar:', err);
       alert('❌ Error: ' + (err.message || 'Error al eliminar cliente'));
@@ -108,32 +150,155 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({ onElim
     setConfirmacion({ mostrar: false, cliente: null });
   };
 
-
-
-  // ✅ CANCELAR
   const cancelarEliminar = () => {
     setConfirmacion({ mostrar: false, cliente: null });
   };
 
-
-
-  // ✅ FORMATEAR FECHA
   const formatearFecha = (fecha: any) => {
     if (!fecha) return '—';
     return new Date(fecha).toLocaleDateString('es-BO');
   };
 
-
-
   if (cargando) {
     return <div className="p-8 text-center text-zinc-400">🔄 Cargando clientes...</div>;
   }
 
-
-
   return (
     <div className="space-y-4">
-      {/* ✅ VENTANA DE CONFIRMACIÓN EN EL CENTRO */}
+      {/* MODAL: ASIGNAR CUENTA MANUALMENTE */}
+      {modalAsignarAbierto && clienteSeleccionado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-[#181818] border border-zinc-700 rounded-2xl p-6 max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Gift className="w-5 h-5 text-amber-400" />
+                  Asignar Cuenta Manualmente
+                </h3>
+                <p className="text-xs text-zinc-400 mt-1">
+                  Cliente: <span className="text-white font-semibold">{clienteSeleccionado.nombre}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setModalAsignarAbierto(false)}
+                className="text-zinc-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* PASO 1: Elegir servicio */}
+              <div>
+                <label className="block text-xs font-semibold text-zinc-400 mb-2">
+                  📌 Paso 1: Elige el servicio
+                </label>
+                <select
+                  value={servicioSeleccionadoId}
+                  onChange={(e) => {
+                    setServicioSeleccionadoId(e.target.value);
+                    setCuentaSeleccionadaId('');
+                  }}
+                  className="w-full bg-[#121212] text-white border border-zinc-700 rounded-lg px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none"
+                >
+                  <option value="">-- Selecciona un servicio --</option>
+                  {servicios.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.nombre} - ${s.precio.toFixed(2)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* PASO 2: Elegir cuenta disponible */}
+              {servicioSeleccionadoId && (
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-400 mb-2">
+                    🔑 Paso 2: Elige una cuenta disponible
+                    <span className="ml-2 text-amber-400">
+                      ({cuentasDisponibles.length} disponibles)
+                    </span>
+                  </label>
+                  
+                  {cuentasDisponibles.length === 0 ? (
+                    <div className="bg-rose-950/30 border border-rose-800/50 rounded-lg p-3 text-sm text-rose-300">
+                      ⚠️ No hay cuentas disponibles para este servicio. Agrega cuentas primero.
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                      {cuentasDisponibles.map(cuenta => (
+                        <label
+                          key={cuenta.id}
+                          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                            cuentaSeleccionadaId === cuenta.id
+                              ? 'bg-amber-950/40 border-amber-600/60'
+                              : 'bg-zinc-900/60 border-zinc-700 hover:border-zinc-600'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="cuenta"
+                            checked={cuentaSeleccionadaId === cuenta.id}
+                            onChange={() => setCuentaSeleccionadaId(cuenta.id)}
+                            className="mt-1 accent-amber-500"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold text-white text-sm break-all">
+                                {cuenta.usuario_correo}
+                              </span>
+                              {cuenta.perfil && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-600/30 text-blue-300">
+                                  👤 {cuenta.perfil}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-zinc-400 mt-1 space-x-3">
+                              <span>🔑 {cuenta.contrasena}</span>
+                              {cuenta.pin && <span>📌 PIN: {cuenta.pin}</span>}
+                            </div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* RESUMEN */}
+              {cuentaSeleccionadaId && servicioSeleccionado && (
+                <div className="bg-emerald-950/30 border border-emerald-800/50 rounded-lg p-3 text-xs">
+                  <p className="text-emerald-300">
+                    ✅ Se creará una orden de compra por <strong>${servicioSeleccionado.precio.toFixed(2)}</strong>
+                    <br />
+                    La cuenta se marcará como <strong>Entregada</strong> y el stock bajará automáticamente.
+                  </p>
+                </div>
+              )}
+
+              {/* BOTONES */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setModalAsignarAbierto(false)}
+                  className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-sm font-bold transition-colors"
+                  disabled={procesando}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarAsignacion}
+                  disabled={!cuentaSeleccionadaId || procesando}
+                  className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:bg-zinc-700 disabled:text-zinc-500 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold transition-colors"
+                >
+                  {procesando ? '⏳ Procesando...' : '✅ Asignar Cuenta'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VENTANA DE CONFIRMACIÓN ELIMINAR */}
       {confirmacion.mostrar && confirmacion.cliente && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
@@ -160,9 +325,7 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({ onElim
         </div>
       )}
 
-
-
-      {/* ✅ BUSCADOR Y FILTROS */}
+      {/* BUSCADOR Y FILTROS */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
@@ -191,9 +354,7 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({ onElim
         </div>
       </div>
 
-
-
-      {/* ✅ TABLA DE CLIENTES — AHORA MUESTRA LA CONTRASEÑA */}
+      {/* TABLA DE CLIENTES */}
       <div className="overflow-x-auto rounded-xl border border-zinc-800">
         <table className="w-full text-sm">
           <thead className="bg-zinc-800 text-left text-zinc-300">
@@ -203,7 +364,7 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({ onElim
               <th className="py-3 px-4">ESTADO</th>
               <th className="py-3 px-4">TOTAL GASTADO</th>
               <th className="py-3 px-4">CONTRASEÑA</th>
-              <th className="py-3 px-4 text-center">ACCIÓN</th>
+              <th className="py-3 px-4 text-center">ACCIONES</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800">
@@ -239,18 +400,26 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({ onElim
                   <td className="py-3 px-4 font-semibold text-emerald-400">
                     ${Number(cli.total_gastado || 0).toFixed(2)}
                   </td>
-                  {/* ✅ AQUÍ MUESTRA LA CONTRASEÑA REAL */}
                   <td className="py-3 px-4 font-mono text-xs text-amber-400 font-bold">
                     {cli.contrasena || 'Sin contraseña'}
                   </td>
                   <td className="py-3 px-4 text-center">
-                    <button
-                      onClick={() => mostrarConfirmarEliminar(cli)}
-                      className="p-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/40 transition-colors"
-                      title="Eliminar cliente"
-                    >
-                      <Trash2 className="w-4 h-4 text-rose-400" />
-                    </button>
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button
+                        onClick={() => abrirModalAsignar(cli)}
+                        className="p-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/40 transition-colors"
+                        title="🎁 Asignar cuenta manualmente (Venta directa)"
+                      >
+                        <Gift className="w-4 h-4 text-amber-400" />
+                      </button>
+                      <button
+                        onClick={() => mostrarConfirmarEliminar(cli)}
+                        className="p-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/40 transition-colors"
+                        title="Eliminar cliente"
+                      >
+                        <Trash2 className="w-4 h-4 text-rose-400" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))

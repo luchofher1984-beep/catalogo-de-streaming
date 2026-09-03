@@ -1,11 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-
 const supabaseUrl = "https://qdwziqslnbrivpnpgyan.supabase.co";
 const supabaseKey = "sb_publishable_Jdb22SFQnLE5qGND3ZQcHw_glUPYyUJ";
 export const supabase = createClient(supabaseUrl, supabaseKey);
-
-
 
 class RealSupabaseClient {
   public async getServicios(): Promise<{ data: any[]; error: string | null }> {
@@ -20,8 +17,6 @@ class RealSupabaseClient {
     }));
     return { data: serviciosReales, error: null };
   }
-
-
 
   public async crearServicio(nuevo: any): Promise<{ data: any | null; error: string | null }> {
     const datosParaGuardar = {
@@ -46,8 +41,6 @@ class RealSupabaseClient {
     return { data: { ...nuevo, ...data }, error: null };
   }
 
-
-
   public async editarServicio(id: string, updates: any): Promise<{ data: any | null; error: string | null }> {
     const datosParaGuardar: any = {};
     if (updates.nombre !== undefined) datosParaGuardar.nombre = updates.nombre;
@@ -70,14 +63,10 @@ class RealSupabaseClient {
     return { data: { ...updates, ...data }, error: null };
   }
 
-
-
   public async eliminarServicio(id: string): Promise<{ success: boolean; error: string | null }> {
     const { error } = await supabase.from('servicios').delete().eq('id', id);
     return { success: !error, error: error ? error.message : null };
   }
-
-
 
   public async getOrdenes(): Promise<{ data: any[]; error: string | null }> {
     try {
@@ -87,7 +76,16 @@ class RealSupabaseClient {
     } catch (err: any) { console.error('❌ Excepción al leer órdenes:', err); return { data: [], error: err.message }; }
   }
 
-
+  // ✅ FUNCIÓN QUE FALTABA: ELIMINAR ORDEN DE COMPRA
+  public async eliminarOrdenCompra(ordenId: string): Promise<{ success: boolean; error: any }> {
+    try {
+      const { error } = await supabase.from('ordenes').delete().eq('id', ordenId);
+      if (error) return { success: false, error };
+      return { success: true, error: null };
+    } catch (err) {
+      return { success: false, error: err };
+    }
+  }
 
   public async comprarServicio(
     servicioId: string,
@@ -98,18 +96,12 @@ class RealSupabaseClient {
     const ordenId = `ORD-${Date.now()}`;
     const fechaCompra = new Date();
     const fechaLocal = new Date(fechaCompra.getTime() - fechaCompra.getTimezoneOffset() * 60000).toISOString();
-
-
     const { cuenta, error: errorAsignar } = await this.asignarCuenta(servicioId, ordenId);
     if (errorAsignar || !cuenta) {
       return { data: null, error: errorAsignar || '❌ No hay cuentas disponibles' };
     }
-
-
     const { data: servicio } = await supabase.from('servicios').select('precio, nombre').eq('id', servicioId).single();
     if (!servicio) return { data: null, error: 'Servicio no encontrado' };
-
-
     const ordenDatos = {
       id: ordenId,
       fecha: fechaLocal,
@@ -125,19 +117,14 @@ class RealSupabaseClient {
       total: servicio.precio * cantidad,
       estado: 'completada'
     };
-
-
     const { error: errorGuardar } = await supabase.from('ordenes').insert([ordenDatos]);
     if (errorGuardar) {
       console.error('❌ Error al guardar orden:', errorGuardar);
       return { data: null, error: 'Error al guardar: ' + errorGuardar.message };
     }
-    
     console.log('✅ Orden guardada:', ordenId);
     return { data: ordenDatos, error: null };
   }
-
-
 
   public async getConfiguracion(): Promise<{ data: any; error: string | null }> {
     const { data, error } = await supabase.from('configuraciones_sistema').select('*').limit(1);
@@ -148,8 +135,6 @@ class RealSupabaseClient {
     }
     return { data: config, error: null };
   }
-
-
 
   public async guardarConfiguracion(config: any, imagenArchivo?: File): Promise<{ success: boolean; data: any; error: string | null }> {
     try {
@@ -163,8 +148,8 @@ class RealSupabaseClient {
       }
       const datosGuardar = { qr_imagen_url, qr_instrucciones: config.qr_instrucciones, metodo_qr_activo: config.metodo_qr_activo, metodo_transferencia_activo: config.metodo_transferencia_activo, metodo_efectivo_activo: config.metodo_efectivo_activo, dias_garantia_default: Number(config.dias_garantia_default), correo_soporte: config.correo_soporte, mensaje_pie_pagina: config.mensaje_pie_pagina, actualizado_en: new Date().toISOString() };
       const { data: existente } = await supabase.from('configuraciones_sistema').select('id').limit(1).single();
-      const resultado = existente?.id 
-        ? await supabase.from('configuraciones_sistema').update(datosGuardar).eq('id', existente.id).select().single() 
+      const resultado = existente?.id
+        ? await supabase.from('configuraciones_sistema').update(datosGuardar).eq('id', existente.id).select().single()
         : await supabase.from('configuraciones_sistema').insert([datosGuardar]).select().single();
       const { data, error } = resultado;
       if (error) return { success: false, data: null, error: error.message };
@@ -172,9 +157,6 @@ class RealSupabaseClient {
     } catch (err: any) { return { success: false, data: null, error: err.message }; }
   }
 
-
-
-  // ✅ FUNCIÓN CORREGIDA: AHORA INCLUYE LA CONTRASEÑA
   public async getClientes(): Promise<{ data: any[]; error: string | null }> {
     try {
       const { data: perfiles, error } = await supabase.from('perfiles').select('*').order('created_at', { ascending: false });
@@ -183,32 +165,28 @@ class RealSupabaseClient {
       const clientesReales = (perfiles || []).map((p: any) => {
         const comprasCliente = (pedidos || []).filter((ped: any) => ped.cliente_correo === p.correo);
         const totalGastado = comprasCliente.reduce((acc: number, curr: any) => acc + (Number(curr.total) || 0), Number(p.total_gastado) || 0);
-        return { 
-          id: p.id, 
-          nombre: p.nombre || 'Sin nombre', 
-          correo: p.correo || 'Sin correo', 
-          contrasena: p.contrasena || '', // ✅ INCLUYE LA CONTRASEÑA
-          telefono: p.telefono || 'No registrado', 
-          fecha_registro: p.created_at || new Date().toISOString(), 
-          estado: p.estado || 'activo', 
-          total_gastado: totalGastado, 
-          saldo_pendiente: p.saldo_pendiente || 0, 
-          servicios_activos: comprasCliente.map((c: any) => c.servicio_nombre) 
+        return {
+          id: p.id,
+          nombre: p.nombre || 'Sin nombre',
+          correo: p.correo || 'Sin correo',
+          contrasena: p.contrasena || '',
+          telefono: p.telefono || 'No registrado',
+          fecha_registro: p.created_at || new Date().toISOString(),
+          estado: p.estado || 'activo',
+          total_gastado: totalGastado,
+          saldo_pendiente: p.saldo_pendiente || 0,
+          servicios_activos: comprasCliente.map((c: any) => c.servicio_nombre)
         };
       });
       return { data: clientesReales, error: null };
     } catch (err: any) { return { data: [], error: err.message }; }
   }
 
-
-
   public async actualizarEstadoCliente(id: string, nuevoEstado: 'activo' | 'bloqueado'): Promise<{ success: boolean; error: string | null }> {
     const { error } = await supabase.from('perfiles').update({ estado: nuevoEstado }).eq('id', id);
     return { success: !error, error: error ? error.message : null };
   }
 
-
-  // ✅ FUNCIÓN AGREGADA: ELIMINAR CLIENTE
   public async eliminarCliente(id: string): Promise<{ success: boolean; error: any }> {
     try {
       const { error } = await supabase.from('perfiles').delete().eq('id', id);
@@ -219,21 +197,15 @@ class RealSupabaseClient {
     }
   }
 
-
-
   public async editarCliente(id: string, updates: any): Promise<{ success: boolean; error: string | null }> {
     console.log(`Cliente ${id} actualizado:`, updates);
     return { success: true, error: null };
   }
 
-
-
   public async actualizarStock(servicioId: string, nuevoStock: number): Promise<{ success: boolean; error: string | null }> {
     const { error } = await supabase.from('servicios').update({ stock: nuevoStock }).eq('id', servicioId);
     return { success: !error, error: error ? error.message : null };
   }
-
-
 
   public async getCuentasPorServicio(servicioId: string): Promise<{ data: any[]; error: string | null }> {
     try {
@@ -242,16 +214,12 @@ class RealSupabaseClient {
     } catch (err: any) { return { data: [], error: err.message }; }
   }
 
-
-
   public async getTodasLasCuentas(): Promise<{ data: any[]; error: string | null }> {
     try {
       const { data, error } = await supabase.from('cuentas_servicio').select('*').order('creado_en', { ascending: false });
       return { data: data || [], error: error?.message || null };
     } catch (err: any) { return { data: [], error: err.message }; }
   }
-
-
 
   public async agregarCuenta(cuenta: { servicio_id: string; usuario_correo: string; contrasena: string; perfil?: string; pin?: string; }): Promise<{ data: any; error: string | null }> {
     const datos = { ...cuenta, estado: 'disponible', creado_en: new Date().toISOString() };
@@ -261,16 +229,12 @@ class RealSupabaseClient {
     return { data, error: null };
   }
 
-
-
   public async eliminarCuenta(cuentaId: string): Promise<{ success: boolean; error: string | null }> {
     const { data: cuenta } = await supabase.from('cuentas_servicio').select('servicio_id').eq('id', cuentaId).single();
     const { error } = await supabase.from('cuentas_servicio').delete().eq('id', cuentaId);
     if (!error) await this.sincronizarStockDesdeCuentas();
     return { success: !error, error: error?.message || null };
   }
-
-
 
   public async asignarCuenta(servicioId: string, ordenId: string): Promise<{ cuenta: any; error: string | null }> {
     try {
@@ -280,47 +244,45 @@ class RealSupabaseClient {
         .select('*')
         .eq('servicio_id', servicioId)
         .limit(10);
-      
+
       if (errorBusqueda) return { cuenta: null, error: 'Error al buscar cuentas' };
-      
+
       const cuentaDisponible = (cuentas || []).find(c => {
         const estado = (c.estado || '').trim().toLowerCase();
         return estado === 'disponible' || estado === '' || estado === null;
       });
-      
+
       if (!cuentaDisponible) return { cuenta: null, error: '❌ No hay cuentas disponibles' };
-      
+
       const { data: cuentaActualizada, error: errorActualizar } = await supabase
         .from('cuentas_servicio')
-        .update({ 
-          estado: 'entregada', 
+        .update({
+          estado: 'entregada',
           orden_id: ordenId,
-          entregada_en: new Date().toISOString() 
+          entregada_en: new Date().toISOString()
         })
         .eq('id', cuentaDisponible.id)
         .select()
         .single();
-      
+
       if (!errorActualizar) {
         console.log('✅ Cuenta marcada como ENTREGADA');
         await this.sincronizarStockDesdeCuentas();
       }
-      
+
       return { cuenta: cuentaActualizada || cuentaDisponible, error: errorActualizar?.message || null };
-    } catch (err: any) { 
+    } catch (err: any) {
       console.error('❌ Error en asignarCuenta:', err);
-      return { cuenta: null, error: err.message }; 
+      return { cuenta: null, error: err.message };
     }
   }
-
-
 
   public async sincronizarStockDesdeCuentas(): Promise<{ success: boolean; error?: string }> {
     try {
       console.log('🔄 Sincronizando stock...');
       const { data: cuentas, error: errorCuentas } = await supabase.from('cuentas_servicio').select('servicio_id, estado');
       if (errorCuentas) throw errorCuentas;
-      
+
       const conteoStock: Record<string, number> = {};
       (cuentas || []).forEach((cuenta: any) => {
         const estado = (cuenta.estado || '').trim().toLowerCase();
@@ -328,29 +290,26 @@ class RealSupabaseClient {
           conteoStock[cuenta.servicio_id] = (conteoStock[cuenta.servicio_id] || 0) + 1;
         }
       });
-      
+
       const { data: servicios, error: errorServicios } = await supabase.from('servicios').select('id');
       if (errorServicios) throw errorServicios;
-      
+
       const promesas = (servicios || []).map(async (servicio: any) => {
         const stockReal = conteoStock[servicio.id] || 0;
         const estadoServicio = stockReal > 0 ? 'activo' : 'agotado';
         console.log(`📦 Servicio ${servicio.id} → stock: ${stockReal}`);
         return await supabase.from('servicios').update({ stock: stockReal, estado: estadoServicio }).eq('id', servicio.id);
       });
-      
+
       await Promise.all(promesas);
       console.log('✅ STOCK SINCRONIZADO');
       return { success: true };
-    } catch (err: any) { 
+    } catch (err: any) {
       console.error('❌ Error sincronizando:', err);
-      return { success: false, error: err.message }; 
+      return { success: false, error: err.message };
     }
   }
 
-
-
-  // ✅ 1. LIBERAR CUENTA → vuelve a DISPONIBLE
   public async liberarCuenta(cuentaId: string): Promise<{ success: boolean; error: any }> {
     try {
       const { error } = await supabase
@@ -361,9 +320,8 @@ class RealSupabaseClient {
           entregada_en: null
         })
         .eq('id', cuentaId);
-      
+
       if (error) return { success: false, error };
-      
       await this.sincronizarStockDesdeCuentas();
       return { success: true, error: null };
     } catch (err) {
@@ -371,9 +329,6 @@ class RealSupabaseClient {
     }
   }
 
-
-
-  // ✅ 2. AUMENTAR STOCK del servicio en +1
   public async aumentarStockServicio(servicioId: string): Promise<{ success: boolean; error: any }> {
     try {
       const { data: servicioActual } = await supabase
@@ -381,17 +336,11 @@ class RealSupabaseClient {
         .select('stock')
         .eq('id', servicioId)
         .single();
-
-
       const nuevoStock = Math.max(0, (servicioActual?.stock || 0) + 1);
-
-
       const { error } = await supabase
         .from('servicios')
         .update({ stock: nuevoStock })
         .eq('id', servicioId);
-
-
       if (error) return { success: false, error };
       return { success: true, error: null };
     } catch (err) {
@@ -399,76 +348,77 @@ class RealSupabaseClient {
     }
   }
 
+  public async crearOrdenCompra(datos: any) {
+    return supabase
+      .from('ordenes')
+      .insert([{
+        ...datos,
+        fecha: new Date().toISOString()
+      }])
+      .select()
+      .single();
+  }
 
+  public async entregarCuenta(cuentaId: string, ordenId: string) {
+    return supabase
+      .from('cuentas_servicio')
+      .update({
+        estado: 'entregada',
+        orden_id: ordenId,
+        entregada_en: new Date().toISOString()
+      })
+      .eq('id', cuentaId)
+      .then(async (resultado) => {
+        await this.sincronizarStockDesdeCuentas();
+        return resultado;
+      });
+  }
 
-  // ✅ 3. ELIMINAR ORDEN COMPLETO
-  public async eliminarOrdenCompra(ordenId: string): Promise<{ success: boolean; error: any }> {
+  public async disminuirStockServicio(servicioId: string) {
     try {
-      console.log('🗑️ Eliminando orden:', ordenId);
-
-
-      // Buscar la cuenta asignada a esta orden
-      const { data: cuentaEncontrada } = await supabase
-        .from('cuentas_servicio')
-        .select('*')
-        .eq('orden_id', ordenId)
-        .limit(1)
+      const { data: servicioActual } = await supabase
+        .from('servicios')
+        .select('stock')
+        .eq('id', servicioId)
         .single();
 
+      const stockActual = servicioActual?.stock || 0;
+      const nuevoStock = Math.max(0, stockActual - 1);
 
-      // Si existe → LIBERARLA
-      if (cuentaEncontrada) {
-        console.log('✅ Cuenta encontrada, devolviendo a LIBRE:', cuentaEncontrada.id);
-        
-        const { error: errorLiberar } = await supabase
-          .from('cuentas_servicio')
-          .update({
-            estado: 'disponible',
-            orden_id: null,
-            entregada_en: null
-          })
-          .eq('id', cuentaEncontrada.id);
+      const resultado = await supabase
+        .from('servicios')
+        .update({ stock: nuevoStock })
+        .eq('id', servicioId);
 
-
-        if (errorLiberar) {
-          console.error('❌ Error al liberar cuenta:', errorLiberar);
-          return { success: false, error: errorLiberar };
-        }
-        
-        await this.sincronizarStockDesdeCuentas();
-        console.log('✅ Cuenta LIBERADA y STOCK actualizado ✨');
-      }
-
-
-      // Eliminar la orden
-      const { error: errorEliminarOrden } = await supabase
-        .from('ordenes')
-        .delete()
-        .eq('id', ordenId);
-
-
-      if (errorEliminarOrden) {
-        console.error('❌ Error al eliminar orden:', errorEliminarOrden);
-        return { success: false, error: errorEliminarOrden };
-      }
-
-
-      console.log('✅ Orden eliminada correctamente ✅');
-      return { success: true, error: null };
-
-
-    } catch (err) {
-      console.error('❌ Excepción al eliminar orden:', err);
-      return { success: false, error: err };
+      return resultado;
+    } catch (err: any) {
+      console.warn('⚠️ No se pudo actualizar el stock:', err.message);
+      return { error: null };
     }
   }
 
+  public async aumentarTotalGastado(clienteId: string, monto: number) {
+    try {
+      const { data: perfil } = await supabase
+        .from('perfiles')
+        .select('total_gastado')
+        .eq('id', clienteId)
+        .single();
 
+      const actual = perfil?.total_gastado || 0;
+
+      return await supabase
+        .from('perfiles')
+        .update({ total_gastado: actual + monto })
+        .eq('id', clienteId);
+    } catch (err: any) {
+      console.warn('⚠️ No se pudo actualizar el total gastado:', err.message);
+      return { error: null };
+    }
+  }
 
   public resetearCatalogo() { return []; }
   public getSupabaseSQLSchema() { return ""; }
 }
-
-
 
 export const supabaseService = new RealSupabaseClient();

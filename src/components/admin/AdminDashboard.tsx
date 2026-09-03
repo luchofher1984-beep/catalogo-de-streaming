@@ -11,19 +11,14 @@ import { EditServiceModal } from './EditServiceModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { LogoutModal } from './LogoutModal';
 import { AdminAllAccounts } from './AdminAllAccounts';
-
-
 // ✅ Importamos el servicio
 import { supabaseService } from '../../services/supabaseService';
-
-
 import {
   Plus,
   Menu,
   Store,
   RefreshCw,
 } from 'lucide-react';
-
 
 // ✅ Tipo AdminTab que coincide con tus nombres
 type AdminTabLocal = 
@@ -33,7 +28,6 @@ type AdminTabLocal =
   | 'clientes'
   | 'metricas'
   | 'configuraciones';
-
 
 interface AdminDashboardProps {
   servicios: ServicioStreaming[];
@@ -45,7 +39,6 @@ interface AdminDashboardProps {
   onIrATienda: () => void;
   onVerServicioEnTienda: (servicio: ServicioStreaming) => void;
 }
-
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({
   servicios,
@@ -61,10 +54,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isOpenMobileSidebar, setIsOpenMobileSidebar] = useState(false);
   const [configuracion, setConfiguracion] = useState<ConfiguracionSistema | null>(null);
   const [cargandoConfig, setCargandoConfig] = useState(true);
-
   const [perfiles, setPerfiles] = useState<any[]>([]);
   const [todasLasCuentas, setTodasLasCuentas] = useState<any[]>([]);
-
 
   const cargarTodasLasCuentas = async () => {
     console.log('🔄 Recargando lista completa de cuentas...');
@@ -77,7 +68,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-
   const cargarPerfiles = async () => {
     console.log('🔄 Cargando perfiles de clientes...');
     const { data, error } = await supabaseService.getClientes();
@@ -88,7 +78,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setPerfiles(data || []);
     }
   };
-
 
   useEffect(() => {
     const cargarConfig = async () => {
@@ -105,12 +94,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     cargarConfig();
   }, []);
 
-
   useEffect(() => {
     cargarTodasLasCuentas();
     cargarPerfiles();
   }, []);
-
 
   const handleGuardarConfiguracion = async (config: Partial<ConfiguracionSistema>, imagenQR?: File): Promise<boolean> => {
     const { success, data } = await supabaseService.guardarConfiguracion(config, imagenQR);
@@ -118,12 +105,74 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return success;
   };
 
+  // ═══════════════════════════════════════════════════════════
+  // ✅ FUNCIÓN NUEVA: ASIGNAR CUENTA MANUALMENTE (VENTA DIRECTA)
+  // ═══════════════════════════════════════════════════════════
+  const asignarCuentaManualmente = async (
+    clienteId: string,
+    cuentaId: string,
+    servicioId: string
+  ): Promise<boolean> => {
+    try {
+      console.log('🎁 Asignando cuenta manualmente...');
+
+      // PASO 1: Buscar datos del servicio para el precio
+      const servicio = servicios.find(s => s.id === servicioId);
+      if (!servicio) {
+        alert('❌ Servicio no encontrado');
+        return false;
+      }
+
+      // PASO 2: Crear la orden de compra (como compra normal)
+      const { data: ordenCreada, error: errorOrden } = await supabaseService.crearOrdenCompra({
+        cliente_id: clienteId,
+        servicio_id: servicioId,
+        cuenta_id: cuentaId,
+        monto: servicio.precio,
+        estado: 'completada',
+        metodo_pago: 'manual',
+        tipo_venta: 'directa_admin'
+      });
+
+      if (errorOrden) {
+        alert('❌ Error al crear la orden:\n' + errorOrden.message);
+        return false;
+      }
+      console.log('✅ Orden creada correctamente');
+
+      // PASO 3: Marcar la cuenta como ENTREGADA
+      const { error: errorEntregar } = await supabaseService.entregarCuenta(cuentaId, ordenCreada.id);
+      if (errorEntregar) {
+        alert('❌ Error al entregar la cuenta:\n' + errorEntregar.message);
+        return false;
+      }
+      console.log('✅ Cuenta marcada como Entregada');
+
+      // PASO 4: Disminuir stock del servicio
+      const { error: errorStock } = await supabaseService.disminuirStockServicio(servicioId);
+      if (errorStock) {
+        console.warn('⚠️ No se pudo actualizar el stock automáticamente');
+      }
+
+      // PASO 5: Aumentar total gastado del cliente
+      await supabaseService.aumentarTotalGastado(clienteId, servicio.precio);
+
+      // ✅ RECARGAR TODO
+      await cargarTodasLasCuentas();
+      console.log('✅ ¡ASIGNACIÓN COMPLETA!');
+      return true;
+
+    } catch (err: any) {
+      console.error('❌ Error en asignación manual:', err);
+      alert('❌ Error inesperado:\n' + (err.message || 'Error desconocido'));
+      return false;
+    }
+  };
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [servicioAEditar, setServicioAEditar] = useState<ServicioStreaming | null>(null);
   const [servicioAEliminar, setServicioAEliminar] = useState<ServicioStreaming | null>(null);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
-
 
   // ✅ FUNCIÓN ELIMINAR ORDEN — SIN VENTANA DE ÉXITO
   const eliminarOrden = async (orden: any): Promise<boolean> => {
@@ -165,7 +214,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
       console.log('✅ Orden eliminada de la lista');
 
-      // ✅ RECARGAMOS TODO — ❌ SIN VENTANA DE ÉXITO
+      // ✅ RECARGAMOS TODO
       await cargarTodasLasCuentas();
       return true;
 
@@ -176,7 +225,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-
   const totalStock = useMemo(() => {
     return todasLasCuentas.filter(c => 
       (c.estado || '').trim().toLowerCase() === 'disponible' || 
@@ -184,7 +232,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       c.estado === ''
     ).length;
   }, [todasLasCuentas]);
-
 
   const totalActivos = useMemo(() => {
     const serviciosConStock = new Set(
@@ -197,7 +244,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return serviciosConStock.size;
   }, [todasLasCuentas]);
 
-
   const totalAgotados = useMemo(() => {
     const serviciosConStock = new Set(
       todasLasCuentas.filter(c => 
@@ -208,7 +254,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     );
     return servicios.length - serviciosConStock.size;
   }, [servicios, todasLasCuentas]);
-
 
   return (
     <div className="min-h-screen bg-[#101010] text-white flex flex-col lg:flex-row antialiased font-sans overflow-x-hidden">
@@ -294,7 +339,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             />
           )}
 
-          {tabActiva === 'clientes' && <AdminCustomersTable />}
+          {/* ✅ CLIENTES — CON FUNCIÓN DE ASIGNAR CUENTA CONECTADA */}
+          {tabActiva === 'clientes' && (
+            <AdminCustomersTable
+              servicios={servicios}
+              todasLasCuentas={todasLasCuentas}
+              onAsignarCuentaManual={asignarCuentaManualmente}
+            />
+          )}
+
           {tabActiva === 'metricas' && <AdminMetricsView servicios={servicios} ordenes={ordenes} />}
           
           {tabActiva === 'configuraciones' && (
@@ -319,7 +372,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     </div>
   );
 };
-
 
 // ✅ EXPORTACIÓN
 export default AdminDashboard;
