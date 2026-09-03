@@ -1,29 +1,19 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { ServicioStreaming } from '../../types';
 import { supabaseService } from '../../services/supabaseService';
 import {
   Search,
-  Filter,
   Edit,
   Trash2,
-  CheckCircle2,
-  XCircle,
   AlertCircle,
   Eye,
   Plus,
-  Minus,
   Sparkles,
-  ArrowUpDown,
-  Tag,
-  Clock,
-  Shield,
-  Layers,
   Key,
   X,
   User,
   Lock,
   Hash,
-  LogOut,
 } from 'lucide-react';
 
 
@@ -49,7 +39,7 @@ interface AdminServicesTableProps {
   onVerServicioEnTienda: (servicio: ServicioStreaming) => void;
   onActualizarStockRapido: (servicioId: string, nuevoStock: number) => void;
   onAbrirModalNuevoServicio: () => void;
-  onRecargarTodasCuentas: () => Promise<void>; // ✅ NUEVA FUNCIÓN
+  onRecargarTodasCuentas: () => Promise<void>;
 }
 
 
@@ -59,9 +49,8 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
   onEditarServicio,
   onEliminarServicio,
   onVerServicioEnTienda,
-  onActualizarStockRapido,
   onAbrirModalNuevoServicio,
-  onRecargarTodasCuentas, // ✅ Recibimos la función
+  onRecargarTodasCuentas,
 }) => {
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'activos' | 'agotados'>('todos');
@@ -79,7 +68,9 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
     usuario_correo: '',
     contrasena: '',
     perfil: '',
-    pin: ''
+    pin: '',
+    cantidad_perfiles: 1, // ✅ NUEVO: Cantidad de perfiles a crear
+    nombres_perfiles: ''  // ✅ NUEVO: Nombres separados por coma
   });
 
 
@@ -111,35 +102,56 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
   };
 
 
-  // ➕ Agregar cuenta nueva → SIN cartel + ACTUALIZA TODO AUTOMÁTICAMENTE ✅
+  // ═══════════════════════════════════════════
+  // ✅ AGREGAR CUENTA — SOPORTA MÚLTIPLES PERFILES
+  // ═══════════════════════════════════════════
   const handleAgregarCuenta = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!servicioSeleccionado) return;
 
-    const { error } = await supabaseService.agregarCuenta({
-      servicio_id: servicioSeleccionado.id,
-      usuario_correo: nuevaCuenta.usuario_correo,
-      contrasena: nuevaCuenta.contrasena,
-      perfil: nuevaCuenta.perfil || undefined,
-      pin: nuevaCuenta.pin || undefined
-    });
+    const cantidad = Math.max(1, Number(nuevaCuenta.cantidad_perfiles) || 1);
+    const nombresLista = nuevaCuenta.nombres_perfiles
+      .split(',')
+      .map(n => n.trim())
+      .filter(n => n.length > 0);
 
-    if (error) {
-      console.error('❌ Error al agregar cuenta:', error);
-    } else {
-      console.log('✅ Cuenta agregada — Stock actualizado automáticamente');
+    let todoBien = true;
+
+    // ✅ Crea 1 o VARIAS cuentas automáticamente (mismo correo, distinto perfil)
+    for (let i = 0; i < cantidad; i++) {
+      const perfilAsignado = nombresLista[i] || nuevaCuenta.perfil || `Perfil ${i + 1}`;
+
+      const { error } = await supabaseService.agregarCuenta({
+        servicio_id: servicioSeleccionado.id,
+        usuario_correo: nuevaCuenta.usuario_correo,
+        contrasena: nuevaCuenta.contrasena,
+        perfil: perfilAsignado,
+        pin: nuevaCuenta.pin || undefined
+      });
+
+      if (error) {
+        console.error(`❌ Error al agregar cuenta ${i + 1}:`, error);
+        todoBien = false;
+        break;
+      }
+    }
+
+    if (todoBien) {
+      console.log(`✅ ${cantidad} cuenta(s) agregada(s) — Stock actualizado automáticamente`);
       
-      // ✅ Limpiar formulario
-      setNuevaCuenta({ usuario_correo: '', contrasena: '', perfil: '', pin: '' });
+      setNuevaCuenta({ 
+        usuario_correo: '', 
+        contrasena: '', 
+        perfil: '', 
+        pin: '', 
+        cantidad_perfiles: 1, 
+        nombres_perfiles: '' 
+      });
       setFormAgregarAbierto(false);
       
-      // ✅ Recargar lista del modal
       await cargarCuentas(servicioSeleccionado.id);
-      
-      // 🔄 RECARGAR TODO — El número de stock en la tabla se actualiza SOLO ✅
       await onRecargarTodasCuentas();
       
-      // ✅ Cerrar modal
       setModalCuentasAbierto(false);
     }
   };
@@ -151,9 +163,7 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
     if (success) {
       console.log('✅ Cuenta eliminada — Stock actualizado automáticamente');
       if (servicioSeleccionado) {
-        // ✅ Recargar lista del modal
         await cargarCuentas(servicioSeleccionado.id);
-        // 🔄 RECARGAR TODO — El número de stock baja SOLO ✅
         await onRecargarTodasCuentas();
       }
     } else {
@@ -209,7 +219,9 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Barra de Filtros y Controles */}
+      {/* ═══════════════════════════════════════════
+          ✅ BARRA SUPERIOR — BOTÓN AGREGAR SIEMPRE VISIBLE
+          ═══════════════════════════════════════════ */}
       <div className="bg-[#181818] p-4 rounded-2xl border border-zinc-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
@@ -230,6 +242,15 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
             </button>
           )}
         </div>
+
+        {/* ✅ BOTÓN AGREGAR NUEVO SERVICIO — SIEMPRE VISIBLE */}
+        <button
+          onClick={onAbrirModalNuevoServicio}
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg whitespace-nowrap"
+        >
+          <Plus className="w-4 h-4" />
+          Agregar Nuevo Servicio
+        </button>
 
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex rounded-xl bg-[#121212] p-1 border border-zinc-800 text-xs font-semibold">
@@ -289,7 +310,9 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
       </div>
 
 
-      {/* TABLA DE SERVICIOS */}
+      {/* ═══════════════════════════════════════════
+          TABLA DE SERVICIOS
+          ═══════════════════════════════════════════ */}
       <div className="bg-[#181818] rounded-2xl border border-zinc-800 overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table id="tabla-servicios-admin" className="w-full text-left border-collapse">
@@ -480,7 +503,9 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
       </div>
 
 
-      {/* 🪟 VENTANA MODAL: GESTIONAR CUENTAS */}
+      {/* ═══════════════════════════════════════════
+          🪟 MODAL: GESTIONAR CUENTAS (CON PERFILES MÚLTIPLES)
+          ═══════════════════════════════════════════ */}
       {modalCuentasAbierto && servicioSeleccionado && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-[#181818] border border-zinc-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -513,6 +538,9 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                   Agregar Nueva Cuenta
                 </button>
               ) : (
+                /* ═══════════════════════════════════════════
+                   ✅ FORMULARIO NUEVO — CON PERFILES MÚLTIPLES
+                   ═══════════════════════════════════════════ */
                 <form onSubmit={handleAgregarCuenta} className="bg-zinc-900/60 p-5 rounded-xl border border-zinc-800 space-y-4">
                   <h3 className="text-sm font-bold text-white">Nueva Cuenta de Acceso</h3>
                   
@@ -530,6 +558,7 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                         className="w-full bg-[#121212] border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 focus:outline-none"
                       />
                     </div>
+
                     <div>
                       <label className="block text-xs font-semibold text-zinc-400 mb-1.5 flex items-center gap-1">
                         <Lock className="w-3 h-3" /> Contraseña *
@@ -543,21 +572,43 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                         className="w-full bg-[#121212] border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 focus:outline-none"
                       />
                     </div>
+
+                    {/* ✅ NUEVO: Cantidad de perfiles */}
                     <div>
                       <label className="block text-xs font-semibold text-zinc-400 mb-1.5 flex items-center gap-1">
-                        <User className="w-3 h-3" /> Perfil
+                        👥 Cantidad de perfiles *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="10"
+                        required
+                        value={nuevaCuenta.cantidad_perfiles}
+                        onChange={(e) => setNuevaCuenta({...nuevaCuenta, cantidad_perfiles: Number(e.target.value)})}
+                        placeholder="Ej: 5"
+                        className="w-full bg-[#121212] border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 focus:outline-none"
+                      />
+                      <p className="text-[10px] text-zinc-500 mt-1">Netflix = 5, Disney+ = 7, etc.</p>
+                    </div>
+
+                    {/* ✅ NUEVO: Nombres de perfiles */}
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-400 mb-1.5 flex items-center gap-1">
+                        📝 Nombres (separados por coma)
                       </label>
                       <input
                         type="text"
-                        value={nuevaCuenta.perfil}
-                        onChange={(e) => setNuevaCuenta({...nuevaCuenta, perfil: e.target.value})}
-                        placeholder="Admin / Usuario / Niños"
+                        value={nuevaCuenta.nombres_perfiles}
+                        onChange={(e) => setNuevaCuenta({...nuevaCuenta, nombres_perfiles: e.target.value})}
+                        placeholder="Mama, Papa, Niños, Invitado"
                         className="w-full bg-[#121212] border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 focus:outline-none"
                       />
+                      <p className="text-[10px] text-zinc-500 mt-1">Opcional. Si lo dejas vacío: Perfil 1, Perfil 2...</p>
                     </div>
+
                     <div>
                       <label className="block text-xs font-semibold text-zinc-400 mb-1.5 flex items-center gap-1">
-                        <Hash className="w-3 h-3" /> PIN
+                        <Hash className="w-3 h-3" /> PIN (si aplica)
                       </label>
                       <input
                         type="text"
@@ -569,12 +620,24 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                     </div>
                   </div>
 
+                  {/* ✅ AVISO: cuántas cuentas se crearán */}
+                  <div className="bg-amber-950/30 border border-amber-800/50 rounded-lg p-3 text-xs text-amber-300">
+                    ⚡ Se crearán automáticamente <strong>{Math.max(1, Number(nuevaCuenta.cantidad_perfiles) || 1)}</strong> cuenta(s) con el mismo correo y contraseña.
+                  </div>
+
                   <div className="flex gap-3 pt-2">
                     <button
                       type="button"
                       onClick={() => {
                         setFormAgregarAbierto(false);
-                        setNuevaCuenta({ usuario_correo: '', contrasena: '', perfil: '', pin: '' });
+                        setNuevaCuenta({ 
+                          usuario_correo: '', 
+                          contrasena: '', 
+                          perfil: '', 
+                          pin: '', 
+                          cantidad_perfiles: 1, 
+                          nombres_perfiles: '' 
+                        });
                       }}
                       className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-sm font-bold transition-colors"
                     >
@@ -584,12 +647,13 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                       type="submit"
                       className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-bold transition-colors"
                     >
-                      ✅ Guardar Cuenta
+                      ✅ Guardar Cuenta(s)
                     </button>
                   </div>
                 </form>
               )}
 
+              {/* Lista de cuentas */}
               <div className="space-y-2">
                 <h3 className="text-sm font-bold text-zinc-300">Lista de Cuentas</h3>
                 {cargandoCuentas ? (
@@ -611,6 +675,11 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                           <div className="space-y-1 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-bold text-white text-sm">{cuenta.usuario_correo}</span>
+                              {cuenta.perfil && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-600/30 text-blue-300">
+                                  👤 {cuenta.perfil}
+                                </span>
+                              )}
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                 cuenta.estado === 'disponible'
                                   ? 'bg-emerald-600/30 text-emerald-300'
@@ -621,7 +690,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                             </div>
                             <div className="text-xs text-zinc-400 space-x-3">
                               <span>🔑 {cuenta.contrasena}</span>
-                              {cuenta.perfil && <span>👤 {cuenta.perfil}</span>}
                               {cuenta.pin && <span>📌 PIN: {cuenta.pin}</span>}
                             </div>
                             {cuenta.estado === 'entregada' && cuenta.entregada_en && (
