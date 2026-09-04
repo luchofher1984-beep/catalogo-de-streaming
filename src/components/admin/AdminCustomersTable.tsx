@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, ShieldAlert, ShieldCheck, Calendar, Trash2, Gift, X, Key } from 'lucide-react';
+import { Search, ShieldAlert, ShieldCheck, Calendar, Trash2, Gift, X, MessageCircle } from 'lucide-react';
 
 interface Cliente {
   id: string;
@@ -34,7 +34,12 @@ interface AdminCustomersTableProps {
   servicios: ServicioStreaming[];
   todasLasCuentas: CuentaServicio[];
   onEliminarCliente?: (id: string) => Promise<boolean>;
-  onAsignarCuentaManual: (clienteId: string, cuentaId: string, servicioId: string) => Promise<boolean>;
+  onAsignarCuentaManual: (
+    clienteId: string,
+    cuentaId: string,
+    servicioId: string,
+    meses: number
+  ) => Promise<boolean>;
 }
 
 export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
@@ -48,10 +53,12 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'activo' | 'bloqueado'>('todos');
   const [confirmacion, setConfirmacion] = useState<{mostrar: boolean; cliente: Cliente | null}>({mostrar: false, cliente: null});
+
   const [modalAsignarAbierto, setModalAsignarAbierto] = useState(false);
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
   const [servicioSeleccionadoId, setServicioSeleccionadoId] = useState<string>('');
   const [cuentaSeleccionadaId, setCuentaSeleccionadaId] = useState<string>('');
+  const [mesesSeleccionados, setMesesSeleccionados] = useState<number>(1); // ✅ NUEVO
   const [procesando, setProcesando] = useState(false);
 
   const cargarClientes = async () => {
@@ -90,28 +97,28 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
   }, [servicioSeleccionadoId, todasLasCuentas]);
 
   const servicioSeleccionado = servicios.find(s => s.id === servicioSeleccionadoId);
+  const precioTotal = servicioSeleccionado ? servicioSeleccionado.precio * mesesSeleccionados : 0;
 
   const abrirModalAsignar = (cliente: Cliente) => {
     setClienteSeleccionado(cliente);
     setServicioSeleccionadoId('');
     setCuentaSeleccionadaId('');
+    setMesesSeleccionados(1);
     setModalAsignarAbierto(true);
   };
 
-  // ═══════════════════════════════════════════════════════════
-  // ✅ SOLUCIÓN DEFINITIVA: agregué el ! aquí ↓
-  // ═══════════════════════════════════════════════════════════
   const confirmarAsignacion = async () => {
     if (!clienteSeleccionado || !cuentaSeleccionadaId || !servicioSeleccionadoId) return;
     setProcesando(true);
     const exito = await onAsignarCuentaManual!(
       clienteSeleccionado.id,
       cuentaSeleccionadaId,
-      servicioSeleccionadoId
+      servicioSeleccionadoId,
+      mesesSeleccionados
     );
     setProcesando(false);
     if (exito) {
-      alert(`✅ Cuenta asignada correctamente a ${clienteSeleccionado.nombre}`);
+      alert(`✅ Cuenta asignada correctamente a ${clienteSeleccionado.nombre}\n\n📱 WhatsApp abierto con el mensaje listo para enviar`);
       setModalAsignarAbierto(false);
       await cargarClientes();
     }
@@ -177,6 +184,9 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
                 </h3>
                 <p className="text-xs text-zinc-400 mt-1">
                   Cliente: <span className="text-white font-semibold">{clienteSeleccionado.nombre}</span>
+                  {clienteSeleccionado.telefono && (
+                    <span className="ml-2 text-emerald-400">📱 {clienteSeleccionado.telefono}</span>
+                  )}
                 </p>
               </div>
               <button
@@ -204,11 +214,40 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
                   <option value="">-- Selecciona un servicio --</option>
                   {servicios.map(s => (
                     <option key={s.id} value={s.id}>
-                      {s.nombre} - ${s.precio.toFixed(2)}
+                      {s.nombre} - ${s.precio.toFixed(2)}/mes
                     </option>
                   ))}
                 </select>
               </div>
+
+              {/* ✅ NUEVO: Seleccionar MESES */}
+              {servicioSeleccionadoId && (
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-400 mb-2">
+                    📅 Duración en meses
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[1, 2, 3, 6, 12].map(m => (
+                      <button
+                        key={m}
+                        onClick={() => setMesesSeleccionados(m)}
+                        className={`py-2 rounded-lg text-sm font-bold transition-colors ${
+                          mesesSeleccionados === m
+                            ? 'bg-amber-600 text-white'
+                            : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                        }`}
+                      >
+                        {m} mes{m > 1 ? 'es' : ''}
+                      </button>
+                    ))}
+                  </div>
+                  {servicioSeleccionado && (
+                    <p className="mt-2 text-xs text-amber-400 font-bold">
+                      💰 Total: ${precioTotal.toFixed(2)} (${servicioSeleccionado.precio.toFixed(2)} × {mesesSeleccionados} meses)
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* PASO 2: Elegir cuenta disponible */}
               {servicioSeleccionadoId && (
@@ -269,7 +308,9 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
               {cuentaSeleccionadaId && servicioSeleccionado && (
                 <div className="bg-emerald-950/30 border border-emerald-800/50 rounded-lg p-3 text-xs">
                   <p className="text-emerald-300">
-                    ✅ Se creará una orden de compra por <strong>${servicioSeleccionado.precio.toFixed(2)}</strong>
+                    ✅ Se creará una orden por <strong>${precioTotal.toFixed(2)}</strong> ({mesesSeleccionados} mes{mesesSeleccionados > 1 ? 'es' : ''})
+                    <br />
+                    📱 Al confirmar se abrirá <strong>WhatsApp</strong> con el mensaje listo para enviar
                     <br />
                     La cuenta se marcará como <strong>Entregada</strong> y el stock bajará automáticamente.
                   </p>
@@ -288,9 +329,10 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
                 <button
                   onClick={confirmarAsignacion}
                   disabled={!cuentaSeleccionadaId || procesando}
-                  className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:bg-zinc-700 disabled:text-zinc-500 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold transition-colors"
+                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
                 >
-                  {procesando ? '⏳ Procesando...' : '✅ Asignar Cuenta'}
+                  <MessageCircle className="w-4 h-4" />
+                  {procesando ? '⏳ Procesando...' : '✅ Asignar + WhatsApp'}
                 </button>
               </div>
             </div>
@@ -407,10 +449,10 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
                     <div className="flex items-center justify-center gap-1.5">
                       <button
                         onClick={() => abrirModalAsignar(cli)}
-                        className="p-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/40 transition-colors"
-                        title="🎁 Asignar cuenta manualmente (Venta directa)"
+                        className="p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/40 transition-colors"
+                        title="🎁 Asignar cuenta + WhatsApp"
                       >
-                        <Gift className="w-4 h-4 text-amber-400" />
+                        <Gift className="w-4 h-4 text-emerald-400" />
                       </button>
                       <button
                         onClick={() => mostrarConfirmarEliminar(cli)}

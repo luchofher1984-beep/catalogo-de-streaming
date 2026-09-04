@@ -106,13 +106,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // ═══════════════════════════════════════════════════════════
-  // ✅ FUNCIÓN CORREGIDA: ASIGNAR CUENTA MANUALMENTE
-  // Guarda TODOS los campos (los de la compra normal + los nuevos)
+  // ✅ FUNCIÓN ACTUALIZADA: ASIGNAR CUENTA + MESES + WHATSAPP
   // ═══════════════════════════════════════════════════════════
   const asignarCuentaManualmente = async (
     clienteId: string,
     cuentaId: string,
-    servicioId: string
+    servicioId: string,
+    meses: number = 1
   ): Promise<boolean> => {
     try {
       console.log('🎁 Asignando cuenta manualmente...');
@@ -138,13 +138,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         return false;
       }
 
-      // PASO 4: Crear la orden CON TODOS LOS CAMPOS
-      // (mismos nombres que usa la compra normal + los nuevos)
+      // PASO 4: Calcular precio total y fecha de vencimiento
+      const precioTotal = servicio.precio * meses;
+      const fechaVencimiento = new Date();
+      fechaVencimiento.setMonth(fechaVencimiento.getMonth() + meses);
+      const fechaVencimientoStr = fechaVencimiento.toLocaleDateString('es-BO');
+
+      // PASO 5: Crear la orden CON TODOS LOS CAMPOS
       const ordenId = `ORD-${Date.now()}`;
       const ordenDatos: any = {
         id: ordenId,
         fecha: new Date().toISOString(),
-        duracion_meses: 1,
+        duracion_meses: meses,
         cliente_nombre: cliente.nombre || 'Cliente',
         cliente_correo: cliente.correo || '',
         cliente_telefono: cliente.telefono || '',
@@ -153,13 +158,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         contrasena: cuenta.contrasena || 'Sin contraseña',
         perfil: cuenta.perfil || 'No especificado',
         pin: cuenta.pin || 'No especificado',
-        total: servicio.precio,
+        total: precioTotal,
         estado: 'completada',
+        vencimiento: fechaVencimiento.toISOString(),
         // Campos nuevos para identificar venta manual
         cliente_id: clienteId,
         servicio_id: servicioId,
         cuenta_id: cuentaId,
-        monto: servicio.precio,
+        monto: precioTotal,
         metodo_pago: 'manual',
         tipo_venta: 'directa_admin'
       };
@@ -176,7 +182,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
       console.log('✅ Orden creada correctamente');
 
-      // PASO 5: Marcar la cuenta como ENTREGADA
+      // PASO 6: Marcar la cuenta como ENTREGADA
       const { error: errorEntregar } = await supabaseService.entregarCuenta(cuentaId, ordenId);
       if (errorEntregar) {
         alert('❌ Error al entregar la cuenta:\n' + errorEntregar.message);
@@ -184,14 +190,42 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
       console.log('✅ Cuenta marcada como Entregada');
 
-      // PASO 6: Disminuir stock
+      // PASO 7: Disminuir stock
       const { error: errorStock } = await supabaseService.disminuirStockServicio(servicioId);
       if (errorStock) {
         console.warn('⚠️ No se pudo actualizar el stock automáticamente');
       }
 
-      // PASO 7: Aumentar total gastado del cliente
-      await supabaseService.aumentarTotalGastado(clienteId, servicio.precio);
+      // PASO 8: Aumentar total gastado del cliente
+      await supabaseService.aumentarTotalGastado(clienteId, precioTotal);
+
+      // ═══════════════════════════════════════════════════════════
+      // ✅ PASO 9: ABRIR WHATSAPP CON EL MENSAJE LISTO
+      // ═══════════════════════════════════════════════════════════
+      const telefono = (cliente.telefono || '').replace(/\D/g, '');
+      if (telefono) {
+        const mensaje = encodeURIComponent(
+`🤝 ¡Hola ${cliente.nombre}!
+
+✅ Tu cuenta de ${servicio.nombre} ya está ACTIVA.
+
+📧 Correo: ${cuenta.usuario_correo}
+🔑 Contraseña: ${cuenta.contrasena}
+${cuenta.perfil ? `👤 Perfil: ${cuenta.perfil}` : ''}
+${cuenta.pin ? `📌 PIN: ${cuenta.pin}` : ''}
+
+📅 Vence el: ${fechaVencimientoStr}
+⏳ Duración: ${meses} mes${meses > 1 ? 'es' : ''}
+
+💡 Recomendación: No cambies la contraseña ni el PIN.
+
+¡Gracias por tu compra! 🙌`
+        );
+        // Abrir WhatsApp en nueva pestaña
+        window.open(`https://wa.me/${telefono}?text=${mensaje}`, '_blank');
+      } else {
+        alert('⚠️ Cuenta asignada correctamente, pero el cliente no tiene teléfono registrado para enviar WhatsApp.');
+      }
 
       // ✅ RECARGAR TODO
       await cargarTodasLasCuentas();
