@@ -100,7 +100,7 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
   const servicioSeleccionado = servicios.find(s => s.id === servicioSeleccionadoId);
   const precioTotal = servicioSeleccionado ? servicioSeleccionado.precio * mesesSeleccionados : 0;
 
-  // ✅ NUEVO: Calcular fecha que se USARÁ (para mostrarla en el resumen)
+  // ✅ Calcular fecha que se USARÁ (para mostrarla en el resumen)
   const fechaQueSeUsara = useMemo(() => {
     if (fechaVencimientoManual) {
       return new Date(fechaVencimientoManual + 'T23:59:59').toLocaleDateString('es-BO');
@@ -119,9 +119,15 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
     setModalAsignarAbierto(true);
   };
 
+  // ✅ FUNCIÓN CORREGIDA: ASEGURA QUE LOS MESES SE ENVIEN BIEN
   const confirmarAsignacion = async () => {
     if (!clienteSeleccionado || !cuentaSeleccionadaId || !servicioSeleccionadoId) return;
     setProcesando(true);
+
+    // ✅ GUARDAMOS EL VALOR DE MESES EN VARIABLE ANTES DE ENVIAR
+    const mesesAEnviar = Number(mesesSeleccionados) || 1;
+    console.log('📤 ENVIANDO — MESES SELECCIONADOS:', mesesAEnviar);
+    console.log('📤 ENVIANDO — FECHA MANUAL:', fechaVencimientoManual || 'Automática');
 
     // ✅ Calcular fecha FINAL que se enviará
     let fechaFinal: string;
@@ -129,27 +135,24 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
       fechaFinal = fechaVencimientoManual;
     } else {
       const fechaCalc = new Date();
-      fechaCalc.setMonth(fechaCalc.getMonth() + mesesSeleccionados);
+      fechaCalc.setMonth(fechaCalc.getMonth() + mesesAEnviar);
       fechaFinal = fechaCalc.toISOString().split('T')[0];
     }
+    console.log('📤 FECHA FINAL A USAR:', fechaFinal);
 
-    console.log('📤 Enviando a función:', {
-      meses: mesesSeleccionados,
-      fecha: fechaFinal,
-      precioTotal: precioTotal
-    });
-
+    // ✅ ENVIAMOS EN ORDEN EXACTO: clienteId, cuentaId, servicioId, meses, fecha
     const exito = await onAsignarCuentaManual!(
       clienteSeleccionado.id,
       cuentaSeleccionadaId,
       servicioSeleccionadoId,
-      mesesSeleccionados, // ✅ MESES REALES
-      fechaFinal // ✅ FECHA FINAL
+      mesesAEnviar,       // ← MESES GARANTIZADOS
+      fechaFinal          // ← FECHA SEPARADA
     );
 
     setProcesando(false);
     if (exito) {
-      alert(`✅ Cuenta asignada correctamente a ${clienteSeleccionado.nombre}\n📅 Vencimiento: ${fechaQueSeUsara}\n⏳ Meses: ${mesesSeleccionados}\n💰 Total: $${precioTotal.toFixed(2)}\n📱 WhatsApp abierto con el mensaje listo para enviar`);
+      const totalCalculado = servicioSeleccionado ? servicioSeleccionado.precio * mesesAEnviar : 0;
+      alert(`✅ Cuenta asignada correctamente a ${clienteSeleccionado.nombre}\n⏳ Duración: ${mesesAEnviar} Mes${mesesAEnviar > 1 ? 'es' : ''}\n💰 Total: $${totalCalculado.toFixed(2)}\n📅 Vencimiento: ${fechaQueSeUsara}\n📱 WhatsApp abierto con el mensaje listo para enviar`);
       setModalAsignarAbierto(false);
       await cargarClientes();
     }
@@ -353,7 +356,7 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
                 </div>
               )}
 
-              {/* ✅ RESUMEN MEJORADO — MUESTRA FECHA REAL */}
+              {/* ✅ RESUMEN — MUESTRA TODO CORRECTAMENTE */}
               {cuentaSeleccionadaId && servicioSeleccionado && (
                 <div className="bg-emerald-950/30 border border-emerald-800/50 rounded-lg p-3 text-xs">
                   <p className="text-emerald-300">
