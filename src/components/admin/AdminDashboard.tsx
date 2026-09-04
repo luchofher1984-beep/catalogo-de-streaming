@@ -11,6 +11,7 @@ import { EditServiceModal } from './EditServiceModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { LogoutModal } from './LogoutModal';
 import { AdminAllAccounts } from './AdminAllAccounts';
+
 // ✅ Importamos el servicio Y el cliente supabase directamente
 import { supabaseService, supabase } from '../../services/supabaseService';
 import {
@@ -106,14 +107,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // ═══════════════════════════════════════════════════════════
-  // ✅ FUNCIÓN ACTUALIZADA: ASIGNAR CUENTA + MESES + WHATSAPP
-  // MENSAJE: OPCIÓN 3 — MINIMALISTA Y ELEGANTE 💎
+  // ✅ FUNCIÓN CORREGIDA: FECHA MANUAL + MESES CORRECTOS EN WHATSAPP
   // ═══════════════════════════════════════════════════════════
   const asignarCuentaManualmente = async (
     clienteId: string,
     cuentaId: string,
     servicioId: string,
-    meses: number = 1
+    meses: number = 1,
+    fechaVencimientoManual?: string // ✅ Recibe fecha manual
   ): Promise<boolean> => {
     try {
       console.log('🎁 Asignando cuenta manualmente...');
@@ -139,11 +140,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         return false;
       }
 
-      // PASO 4: Calcular precio total y fecha de vencimiento
+      // ✅ PASO 4: Calcular PRECIO TOTAL + FECHA (manual o automática)
       const precioTotal = servicio.precio * meses;
-      const fechaVencimiento = new Date();
-      fechaVencimiento.setMonth(fechaVencimiento.getMonth() + meses);
-      const fechaVencimientoStr = fechaVencimiento.toLocaleDateString('es-BO');
+      const etiquetaMeses = `${meses} Mes${meses > 1 ? 'es' : ''}`; // "1 mes" / "2 meses"...
+
+      let fechaVencimiento: Date;
+      let fechaVencimientoStr: string;
+
+      if (fechaVencimientoManual) {
+        // ✅ Usar fecha que el administrador escribió
+        fechaVencimiento = new Date(fechaVencimientoManual + 'T23:59:59');
+        fechaVencimientoStr = fechaVencimiento.toLocaleDateString('es-BO');
+        console.log('📅 Usando fecha MANUAL:', fechaVencimientoStr);
+      } else {
+        // Calcular automáticamente según meses
+        fechaVencimiento = new Date();
+        fechaVencimiento.setMonth(fechaVencimiento.getMonth() + meses);
+        fechaVencimientoStr = fechaVencimiento.toLocaleDateString('es-BO');
+        console.log('📅 Fecha calculada automáticamente:', fechaVencimientoStr);
+      }
 
       // PASO 5: Crear la orden CON TODOS LOS CAMPOS
       const ordenId = `ORD-${Date.now()}`;
@@ -200,7 +215,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       await supabaseService.aumentarTotalGastado(clienteId, precioTotal);
 
       // ═══════════════════════════════════════════════════════════
-      // ✅ MENSAJE WHATSAPP — OPCIÓN 3: MINIMALISTA Y ELEGANTE 💎
+      // ✅ MENSAJE WHATSAPP CORREGIDO: MESES + MONTO TOTAL 💎
       // ═══════════════════════════════════════════════════════════
       const telefono = (cliente.telefono || '').replace(/\D/g, '');
       if (telefono) {
@@ -215,20 +230,19 @@ Cliente: ${cliente.nombre}
 📌 PIN: ${cuenta.pin || 'No especificado'}
 
 📅 Vence: ${fechaVencimientoStr}
-⏳ Duración: ${meses} Mes${meses > 1 ? 'es' : ''}
+⏳ Duración: ${etiquetaMeses}
+💰 Total: $${precioTotal.toFixed(2)}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 💡 No cambies la contraseña ni el PIN.
 ¡Gracias por tu compra! 🙌`
         );
-        // Abrir WhatsApp en nueva pestaña
         window.open(`https://wa.me/${telefono}?text=${mensaje}`, '_blank');
       } else {
         alert('⚠️ Cuenta asignada correctamente, pero el cliente no tiene teléfono registrado para enviar WhatsApp.');
       }
 
-      // ✅ RECARGAR TODO
       await cargarTodasLasCuentas();
       console.log('✅ ¡ASIGNACIÓN COMPLETA!');
       return true;
