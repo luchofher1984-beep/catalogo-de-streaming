@@ -107,6 +107,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // ═══════════════════════════════════════════════════════════
   // ✅ FUNCIÓN ACTUALIZADA: ASIGNAR CUENTA + MESES + WHATSAPP
+  // MENSAJE: OPCIÓN 3 — MINIMALISTA Y ELEGANTE 💎
   // ═══════════════════════════════════════════════════════════
   const asignarCuentaManualmente = async (
     clienteId: string,
@@ -161,7 +162,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         total: precioTotal,
         estado: 'completada',
         vencimiento: fechaVencimiento.toISOString(),
-        // Campos nuevos para identificar venta manual
         cliente_id: clienteId,
         servicio_id: servicioId,
         cuenta_id: cuentaId,
@@ -200,25 +200,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       await supabaseService.aumentarTotalGastado(clienteId, precioTotal);
 
       // ═══════════════════════════════════════════════════════════
-      // ✅ PASO 9: ABRIR WHATSAPP CON EL MENSAJE LISTO
+      // ✅ MENSAJE WHATSAPP — OPCIÓN 3: MINIMALISTA Y ELEGANTE 💎
       // ═══════════════════════════════════════════════════════════
       const telefono = (cliente.telefono || '').replace(/\D/g, '');
       if (telefono) {
         const mensaje = encodeURIComponent(
-`🤝 ¡Hola ${cliente.nombre}!
+`✅ CUENTA ACTIVA — ${servicio.nombre}
 
-✅ Tu cuenta de ${servicio.nombre} ya está ACTIVA.
+Cliente: ${cliente.nombre}
 
 📧 Correo: ${cuenta.usuario_correo}
 🔑 Contraseña: ${cuenta.contrasena}
-${cuenta.perfil ? `👤 Perfil: ${cuenta.perfil}` : ''}
-${cuenta.pin ? `📌 PIN: ${cuenta.pin}` : ''}
+👤 Perfil: ${cuenta.perfil || 'No especificado'}
+📌 PIN: ${cuenta.pin || 'No especificado'}
 
-📅 Vence el: ${fechaVencimientoStr}
-⏳ Duración: ${meses} mes${meses > 1 ? 'es' : ''}
+📅 Vence: ${fechaVencimientoStr}
+⏳ Duración: ${meses} Mes${meses > 1 ? 'es' : ''}
 
-💡 Recomendación: No cambies la contraseña ni el PIN.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+💡 No cambies la contraseña ni el PIN.
 ¡Gracias por tu compra! 🙌`
         );
         // Abrir WhatsApp en nueva pestaña
