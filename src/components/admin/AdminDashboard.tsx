@@ -107,17 +107,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // ═══════════════════════════════════════════════════════════
-  // ✅ FUNCIÓN CORREGIDA: FECHA MANUAL + MESES CORRECTOS EN WHATSAPP
+  // ✅ FUNCIÓN REFORZADA: ASEGURA QUE LOS MESES SE USEN BIEN
   // ═══════════════════════════════════════════════════════════
   const asignarCuentaManualmente = async (
     clienteId: string,
     cuentaId: string,
     servicioId: string,
     meses: number = 1,
-    fechaVencimientoManual?: string // ✅ Recibe fecha manual
+    fechaVencimientoManual?: string
   ): Promise<boolean> => {
     try {
-      console.log('🎁 Asignando cuenta manualmente...');
+      // ✅ 🔍 VERIFICACIÓN: ¿Qué valor de meses llegó?
+      console.log('🔍 VALOR DE MESES RECIBIDO:', meses);
+      console.log('🔍 FECHA MANUAL RECIBIDA:', fechaVencimientoManual);
+
+      // ✅ Asegurar que meses sea un número válido
+      const mesesFinal = Number(meses) && Number(meses) > 0 ? Number(meses) : 1;
+      console.log('✅ MESES FINAL A USAR:', mesesFinal);
 
       // PASO 1: Buscar datos del servicio
       const servicio = servicios.find(s => s.id === servicioId);
@@ -140,24 +146,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         return false;
       }
 
-      // ✅ PASO 4: Calcular PRECIO TOTAL + FECHA (manual o automática)
-      const precioTotal = servicio.precio * meses;
-      const etiquetaMeses = `${meses} Mes${meses > 1 ? 'es' : ''}`; // "1 mes" / "2 meses"...
+      // ✅ PASO 4: Calcular TODO con MESES FINAL
+      const precioTotal = servicio.precio * mesesFinal;
+      const etiquetaMeses = `${mesesFinal} Mes${mesesFinal > 1 ? 'es' : ''}`;
+      
+      console.log('💰 PRECIO TOTAL CALCULADO:', precioTotal);
+      console.log('⏳ ETIQUETA MESES:', etiquetaMeses);
 
       let fechaVencimiento: Date;
       let fechaVencimientoStr: string;
 
       if (fechaVencimientoManual) {
-        // ✅ Usar fecha que el administrador escribió
         fechaVencimiento = new Date(fechaVencimientoManual + 'T23:59:59');
         fechaVencimientoStr = fechaVencimiento.toLocaleDateString('es-BO');
-        console.log('📅 Usando fecha MANUAL:', fechaVencimientoStr);
+        console.log('📅 Usando FECHA MANUAL:', fechaVencimientoStr);
       } else {
-        // Calcular automáticamente según meses
         fechaVencimiento = new Date();
-        fechaVencimiento.setMonth(fechaVencimiento.getMonth() + meses);
+        fechaVencimiento.setMonth(fechaVencimiento.getMonth() + mesesFinal);
         fechaVencimientoStr = fechaVencimiento.toLocaleDateString('es-BO');
-        console.log('📅 Fecha calculada automáticamente:', fechaVencimientoStr);
+        console.log('📅 Fecha calculada AUTOMÁTICAMENTE:', fechaVencimientoStr);
       }
 
       // PASO 5: Crear la orden CON TODOS LOS CAMPOS
@@ -165,7 +172,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const ordenDatos: any = {
         id: ordenId,
         fecha: new Date().toISOString(),
-        duracion_meses: meses,
+        duracion_meses: mesesFinal, // ✅ Usa mesesFinal
         cliente_nombre: cliente.nombre || 'Cliente',
         cliente_correo: cliente.correo || '',
         cliente_telefono: cliente.telefono || '',
@@ -174,16 +181,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         contrasena: cuenta.contrasena || 'Sin contraseña',
         perfil: cuenta.perfil || 'No especificado',
         pin: cuenta.pin || 'No especificado',
-        total: precioTotal,
+        total: precioTotal, // ✅ Usa precioTotal = precio × meses
         estado: 'completada',
         vencimiento: fechaVencimiento.toISOString(),
         cliente_id: clienteId,
         servicio_id: servicioId,
         cuenta_id: cuentaId,
-        monto: precioTotal,
+        monto: precioTotal, // ✅ Usa precioTotal
         metodo_pago: 'manual',
         tipo_venta: 'directa_admin'
       };
+
+      console.log('📋 DATOS DE LA ORDEN A GUARDAR:', ordenDatos);
 
       // Guardar la orden directamente con supabase
       const { error: errorGuardar } = await supabase
@@ -215,7 +224,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       await supabaseService.aumentarTotalGastado(clienteId, precioTotal);
 
       // ═══════════════════════════════════════════════════════════
-      // ✅ MENSAJE WHATSAPP CORREGIDO: MESES + MONTO TOTAL 💎
+      // ✅ MENSAJE WHATSAPP — CON MESES Y TOTAL CORRECTOS 💎
       // ═══════════════════════════════════════════════════════════
       const telefono = (cliente.telefono || '').replace(/\D/g, '');
       if (telefono) {
@@ -238,6 +247,10 @@ Cliente: ${cliente.nombre}
 💡 No cambies la contraseña ni el PIN.
 ¡Gracias por tu compra! 🙌`
         );
+        console.log('📱 MENSAJE WHATSAPP GENERADO:', {
+          duracion: etiquetaMeses,
+          total: precioTotal.toFixed(2)
+        });
         window.open(`https://wa.me/${telefono}?text=${mensaje}`, '_blank');
       } else {
         alert('⚠️ Cuenta asignada correctamente, pero el cliente no tiene teléfono registrado para enviar WhatsApp.');
