@@ -11,8 +11,8 @@ import { EditServiceModal } from './EditServiceModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { LogoutModal } from './LogoutModal';
 import { AdminAllAccounts } from './AdminAllAccounts';
-// ✅ Importamos el servicio
-import { supabaseService } from '../../services/supabaseService';
+// ✅ Importamos el servicio Y el cliente supabase directamente
+import { supabaseService, supabase } from '../../services/supabaseService';
 import {
   Plus,
   Menu,
@@ -106,7 +106,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // ═══════════════════════════════════════════════════════════
-  // ✅ FUNCIÓN NUEVA: ASIGNAR CUENTA MANUALMENTE (VENTA DIRECTA)
+  // ✅ FUNCIÓN CORREGIDA: ASIGNAR CUENTA MANUALMENTE
+  // Guarda TODOS los campos (los de la compra normal + los nuevos)
   // ═══════════════════════════════════════════════════════════
   const asignarCuentaManualmente = async (
     clienteId: string,
@@ -116,45 +117,80 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       console.log('🎁 Asignando cuenta manualmente...');
 
-      // PASO 1: Buscar datos del servicio para el precio
+      // PASO 1: Buscar datos del servicio
       const servicio = servicios.find(s => s.id === servicioId);
       if (!servicio) {
         alert('❌ Servicio no encontrado');
         return false;
       }
 
-      // PASO 2: Crear la orden de compra (como compra normal)
-      const { data: ordenCreada, error: errorOrden } = await supabaseService.crearOrdenCompra({
+      // PASO 2: Buscar datos de la cuenta
+      const cuenta = todasLasCuentas.find(c => c.id === cuentaId);
+      if (!cuenta) {
+        alert('❌ Cuenta no encontrada');
+        return false;
+      }
+
+      // PASO 3: Buscar datos del cliente
+      const cliente = perfiles.find((p: any) => p.id === clienteId);
+      if (!cliente) {
+        alert('❌ Cliente no encontrado');
+        return false;
+      }
+
+      // PASO 4: Crear la orden CON TODOS LOS CAMPOS
+      // (mismos nombres que usa la compra normal + los nuevos)
+      const ordenId = `ORD-${Date.now()}`;
+      const ordenDatos: any = {
+        id: ordenId,
+        fecha: new Date().toISOString(),
+        duracion_meses: 1,
+        cliente_nombre: cliente.nombre || 'Cliente',
+        cliente_correo: cliente.correo || '',
+        cliente_telefono: cliente.telefono || '',
+        servicio_nombre: servicio.nombre,
+        correo: cuenta.usuario_correo || 'Sin correo',
+        contrasena: cuenta.contrasena || 'Sin contraseña',
+        perfil: cuenta.perfil || 'No especificado',
+        pin: cuenta.pin || 'No especificado',
+        total: servicio.precio,
+        estado: 'completada',
+        // Campos nuevos para identificar venta manual
         cliente_id: clienteId,
         servicio_id: servicioId,
         cuenta_id: cuentaId,
         monto: servicio.precio,
-        estado: 'completada',
         metodo_pago: 'manual',
         tipo_venta: 'directa_admin'
-      });
+      };
 
-      if (errorOrden) {
-        alert('❌ Error al crear la orden:\n' + errorOrden.message);
+      // Guardar la orden directamente con supabase
+      const { error: errorGuardar } = await supabase
+        .from('ordenes')
+        .insert([ordenDatos]);
+
+      if (errorGuardar) {
+        console.error('❌ Error al guardar orden:', errorGuardar);
+        alert('❌ Error al crear la orden:\n' + errorGuardar.message);
         return false;
       }
       console.log('✅ Orden creada correctamente');
 
-      // PASO 3: Marcar la cuenta como ENTREGADA
-      const { error: errorEntregar } = await supabaseService.entregarCuenta(cuentaId, ordenCreada.id);
+      // PASO 5: Marcar la cuenta como ENTREGADA
+      const { error: errorEntregar } = await supabaseService.entregarCuenta(cuentaId, ordenId);
       if (errorEntregar) {
         alert('❌ Error al entregar la cuenta:\n' + errorEntregar.message);
         return false;
       }
       console.log('✅ Cuenta marcada como Entregada');
 
-      // PASO 4: Disminuir stock del servicio
+      // PASO 6: Disminuir stock
       const { error: errorStock } = await supabaseService.disminuirStockServicio(servicioId);
       if (errorStock) {
         console.warn('⚠️ No se pudo actualizar el stock automáticamente');
       }
 
-      // PASO 5: Aumentar total gastado del cliente
+      // PASO 7: Aumentar total gastado del cliente
       await supabaseService.aumentarTotalGastado(clienteId, servicio.precio);
 
       // ✅ RECARGAR TODO
