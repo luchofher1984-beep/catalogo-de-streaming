@@ -38,7 +38,8 @@ interface AdminCustomersTableProps {
     clienteId: string,
     cuentaId: string,
     servicioId: string,
-    meses: number
+    meses: number,
+    fechaVencimientoManual?: string // ✅ NUEVO: Fecha manual
   ) => Promise<boolean>;
 }
 
@@ -53,12 +54,12 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'activo' | 'bloqueado'>('todos');
   const [confirmacion, setConfirmacion] = useState<{mostrar: boolean; cliente: Cliente | null}>({mostrar: false, cliente: null});
-
   const [modalAsignarAbierto, setModalAsignarAbierto] = useState(false);
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
   const [servicioSeleccionadoId, setServicioSeleccionadoId] = useState<string>('');
   const [cuentaSeleccionadaId, setCuentaSeleccionadaId] = useState<string>('');
-  const [mesesSeleccionados, setMesesSeleccionados] = useState<number>(1); // ✅ NUEVO
+  const [mesesSeleccionados, setMesesSeleccionados] = useState<number>(1);
+  const [fechaVencimientoManual, setFechaVencimientoManual] = useState<string>(''); // ✅ NUEVO: Estado fecha manual
   const [procesando, setProcesando] = useState(false);
 
   const cargarClientes = async () => {
@@ -104,21 +105,35 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
     setServicioSeleccionadoId('');
     setCuentaSeleccionadaId('');
     setMesesSeleccionados(1);
+    setFechaVencimientoManual(''); // ✅ Reiniciar fecha al abrir
     setModalAsignarAbierto(true);
   };
 
   const confirmarAsignacion = async () => {
     if (!clienteSeleccionado || !cuentaSeleccionadaId || !servicioSeleccionadoId) return;
     setProcesando(true);
+
+    // ✅ Usar fecha manual si la escribió, si no calcular automáticamente
+    let fechaVencimiento: string;
+    if (fechaVencimientoManual) {
+      fechaVencimiento = fechaVencimientoManual;
+    } else {
+      const fechaCalc = new Date();
+      fechaCalc.setMonth(fechaCalc.getMonth() + mesesSeleccionados);
+      fechaVencimiento = fechaCalc.toISOString().split('T')[0];
+    }
+
     const exito = await onAsignarCuentaManual!(
       clienteSeleccionado.id,
       cuentaSeleccionadaId,
       servicioSeleccionadoId,
-      mesesSeleccionados
+      mesesSeleccionados,
+      fechaVencimiento // ✅ Enviamos la fecha manual
     );
+
     setProcesando(false);
     if (exito) {
-      alert(`✅ Cuenta asignada correctamente a ${clienteSeleccionado.nombre}\n\n📱 WhatsApp abierto con el mensaje listo para enviar`);
+      alert(`✅ Cuenta asignada correctamente a ${clienteSeleccionado.nombre}\n📅 Vencimiento: ${fechaVencimiento}\n📱 WhatsApp abierto con el mensaje listo para enviar`);
       setModalAsignarAbierto(false);
       await cargarClientes();
     }
@@ -220,7 +235,7 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
                 </select>
               </div>
 
-              {/* ✅ NUEVO: Seleccionar MESES */}
+              {/* Duración en meses */}
               {servicioSeleccionadoId && (
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 mb-2">
@@ -246,6 +261,24 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
                       💰 Total: ${precioTotal.toFixed(2)} (${servicioSeleccionado.precio.toFixed(2)} × {mesesSeleccionados} meses)
                     </p>
                   )}
+                </div>
+              )}
+
+              {/* ✅ NUEVO: FECHA DE VENCIMIENTO MANUAL */}
+              {servicioSeleccionadoId && (
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-400 mb-2">
+                    📅 Fecha de Vencimiento <span className="text-amber-400">(Escríbela tú)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={fechaVencimientoManual}
+                    onChange={(e) => setFechaVencimientoManual(e.target.value)}
+                    className="w-full bg-[#121212] text-white border border-zinc-700 rounded-lg px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">
+                    💡 Si no eliges fecha, se calculará automáticamente según los meses
+                  </p>
                 </div>
               )}
 
@@ -309,6 +342,8 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
                 <div className="bg-emerald-950/30 border border-emerald-800/50 rounded-lg p-3 text-xs">
                   <p className="text-emerald-300">
                     ✅ Se creará una orden por <strong>${precioTotal.toFixed(2)}</strong> ({mesesSeleccionados} mes{mesesSeleccionados > 1 ? 'es' : ''})
+                    <br />
+                    📅 Vencimiento: <strong>{fechaVencimientoManual || 'Se calculará automáticamente'}</strong>
                     <br />
                     📱 Al confirmar se abrirá <strong>WhatsApp</strong> con el mensaje listo para enviar
                     <br />
