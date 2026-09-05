@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { Search, ShieldAlert, ShieldCheck, Calendar, Trash2, Gift, X, MessageCircle } from 'lucide-react';
-
 interface Cliente {
   id: string;
   nombre: string;
@@ -11,7 +10,6 @@ interface Cliente {
   estado: 'activo' | 'bloqueado';
   total_gastado: number;
 }
-
 interface CuentaServicio {
   id: string;
   servicio_id: string;
@@ -21,7 +19,6 @@ interface CuentaServicio {
   pin?: string;
   estado: 'disponible' | 'entregada';
 }
-
 interface ServicioStreaming {
   id: string;
   nombre: string;
@@ -29,7 +26,6 @@ interface ServicioStreaming {
   precio: number;
   categoria_label?: string;
 }
-
 interface AdminCustomersTableProps {
   servicios: ServicioStreaming[];
   todasLasCuentas: CuentaServicio[];
@@ -42,7 +38,6 @@ interface AdminCustomersTableProps {
     fechaVencimientoManual?: string
   ) => Promise<boolean>;
 }
-
 export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
   servicios,
   todasLasCuentas,
@@ -58,9 +53,33 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
   const [servicioSeleccionadoId, setServicioSeleccionadoId] = useState<string>('');
   const [cuentaSeleccionadaId, setCuentaSeleccionadaId] = useState<string>('');
-  const [mesesSeleccionados, setMesesSeleccionados] = useState<number>(1);
   const [fechaVencimientoManual, setFechaVencimientoManual] = useState<string>('');
   const [procesando, setProcesando] = useState(false);
+
+  // ✅ CALCULAR MESES AUTOMÁTICAMENTE DESDE LA FECHA
+  const mesesCalculados = useMemo(() => {
+    if (!fechaVencimientoManual) return 1;
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const vencimiento = new Date(fechaVencimientoManual + 'T23:59:59');
+    const meses = 
+      (vencimiento.getFullYear() - hoy.getFullYear()) * 12 + 
+      (vencimiento.getMonth() - hoy.getMonth());
+    return Math.max(1, meses); // Mínimo 1 mes
+  }, [fechaVencimientoManual]);
+
+  const servicioSeleccionado = servicios.find(s => s.id === servicioSeleccionadoId);
+  const precioTotal = servicioSeleccionado ? servicioSeleccionado.precio * mesesCalculados : 0;
+
+  // ✅ Calcular fecha formateada para mostrar
+  const fechaQueSeUsara = useMemo(() => {
+    if (fechaVencimientoManual) {
+      return new Date(fechaVencimientoManual + 'T23:59:59').toLocaleDateString('es-BO');
+    }
+    const fechaCalc = new Date();
+    fechaCalc.setMonth(fechaCalc.getMonth() + 1);
+    return fechaCalc.toLocaleDateString('es-BO');
+  }, [fechaVencimientoManual]);
 
   const cargarClientes = async () => {
     try {
@@ -74,7 +93,6 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
       setCargando(false);
     }
   };
-
   React.useEffect(() => {
     cargarClientes();
   }, []);
@@ -97,62 +115,35 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
     );
   }, [servicioSeleccionadoId, todasLasCuentas]);
 
-  const servicioSeleccionado = servicios.find(s => s.id === servicioSeleccionadoId);
-  const precioTotal = servicioSeleccionado ? servicioSeleccionado.precio * mesesSeleccionados : 0;
-
-  // ✅ Calcular fecha que se USARÁ (para mostrarla en el resumen)
-  const fechaQueSeUsara = useMemo(() => {
-    if (fechaVencimientoManual) {
-      return new Date(fechaVencimientoManual + 'T23:59:59').toLocaleDateString('es-BO');
-    }
-    const fechaCalc = new Date();
-    fechaCalc.setMonth(fechaCalc.getMonth() + mesesSeleccionados);
-    return fechaCalc.toLocaleDateString('es-BO');
-  }, [fechaVencimientoManual, mesesSeleccionados]);
-
   const abrirModalAsignar = (cliente: Cliente) => {
     setClienteSeleccionado(cliente);
     setServicioSeleccionadoId('');
     setCuentaSeleccionadaId('');
-    setMesesSeleccionados(1);
     setFechaVencimientoManual('');
     setModalAsignarAbierto(true);
   };
 
-  // ✅ FUNCIÓN CORREGIDA: ASEGURA QUE LOS MESES SE ENVIEN BIEN
   const confirmarAsignacion = async () => {
-    if (!clienteSeleccionado || !cuentaSeleccionadaId || !servicioSeleccionadoId) return;
+    if (!clienteSeleccionado || !cuentaSeleccionadaId || !servicioSeleccionadoId || !fechaVencimientoManual) {
+      alert('⚠️ Debes seleccionar servicio, cuenta y escribir la fecha de vencimiento');
+      return;
+    }
     setProcesando(true);
 
-    // ✅ GUARDAMOS EL VALOR DE MESES EN VARIABLE ANTES DE ENVIAR
-    const mesesAEnviar = Number(mesesSeleccionados) || 1;
-    console.log('📤 ENVIANDO — MESES SELECCIONADOS:', mesesAEnviar);
-    console.log('📤 ENVIANDO — FECHA MANUAL:', fechaVencimientoManual || 'Automática');
+    console.log('📤 FECHA MANUAL:', fechaVencimientoManual);
+    console.log('📤 MESES CALCULADOS:', mesesCalculados);
+    console.log('📤 TOTAL A COBRAR:', precioTotal.toFixed(2));
 
-    // ✅ Calcular fecha FINAL que se enviará
-    let fechaFinal: string;
-    if (fechaVencimientoManual) {
-      fechaFinal = fechaVencimientoManual;
-    } else {
-      const fechaCalc = new Date();
-      fechaCalc.setMonth(fechaCalc.getMonth() + mesesAEnviar);
-      fechaFinal = fechaCalc.toISOString().split('T')[0];
-    }
-    console.log('📤 FECHA FINAL A USAR:', fechaFinal);
-
-    // ✅ ENVIAMOS EN ORDEN EXACTO: clienteId, cuentaId, servicioId, meses, fecha
     const exito = await onAsignarCuentaManual!(
       clienteSeleccionado.id,
       cuentaSeleccionadaId,
       servicioSeleccionadoId,
-      mesesAEnviar,        // ← MESES GARANTIZADOS
-      fechaFinal           // ← FECHA SEPARADA
+      mesesCalculados,
+      fechaVencimientoManual
     );
-
     setProcesando(false);
     if (exito) {
-      const totalCalculado = servicioSeleccionado ? servicioSeleccionado.precio * mesesAEnviar : 0;
-      alert(`✅ Cuenta asignada correctamente a ${clienteSeleccionado.nombre}\n⏳ Duración: ${mesesAEnviar} Mes${mesesAEnviar > 1 ? 'es' : ''}\n💰 Total: $${totalCalculado.toFixed(2)}\n📅 Vencimiento: ${fechaQueSeUsara}\n📱 WhatsApp abierto con el mensaje listo para enviar`);
+      alert(`✅ Cuenta asignada correctamente a ${clienteSeleccionado.nombre}\n⏳ Duración: ${mesesCalculados} Mes${mesesCalculados > 1 ? 'es' : ''}\n💰 Total: $${precioTotal.toFixed(2)}\n📅 Vencimiento: ${fechaQueSeUsara}\n📱 WhatsApp abierto con el mensaje listo para enviar`);
       setModalAsignarAbierto(false);
       await cargarClientes();
     }
@@ -161,7 +152,6 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
   const mostrarConfirmarEliminar = (cliente: Cliente) => {
     setConfirmacion({ mostrar: true, cliente });
   };
-
   const confirmarEliminar = async () => {
     if (!confirmacion.cliente) return;
     
@@ -190,20 +180,16 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
     
     setConfirmacion({ mostrar: false, cliente: null });
   };
-
   const cancelarEliminar = () => {
     setConfirmacion({ mostrar: false, cliente: null });
   };
-
   const formatearFecha = (fecha: any) => {
     if (!fecha) return '—';
     return new Date(fecha).toLocaleDateString('es-BO');
   };
-
   if (cargando) {
     return <div className="p-8 text-center text-zinc-400">🔄 Cargando clientes...</div>;
   }
-
   return (
     <div className="space-y-4">
       {/* MODAL: ASIGNAR CUENTA MANUALMENTE */}
@@ -230,7 +216,6 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
                 <X className="w-5 h-5" />
               </button>
             </div>
-
             <div className="space-y-4">
               {/* PASO 1: Elegir servicio */}
               <div>
@@ -242,6 +227,7 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
                   onChange={(e) => {
                     setServicioSeleccionadoId(e.target.value);
                     setCuentaSeleccionadaId('');
+                    setFechaVencimientoManual('');
                   }}
                   className="w-full bg-[#121212] text-white border border-zinc-700 rounded-lg px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none"
                 >
@@ -254,40 +240,11 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
                 </select>
               </div>
 
-              {/* Duración en meses */}
+              {/* 📅 FECHA DE VENCIMIENTO — SOLO ESTA OPCIÓN */}
               {servicioSeleccionadoId && (
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 mb-2">
-                    📅 Duración en meses
-                  </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[1, 2, 3, 6, 12].map(m => (
-                      <button
-                        key={m}
-                        onClick={() => setMesesSeleccionados(m)}
-                        className={`py-2 rounded-lg text-sm font-bold transition-colors ${
-                          mesesSeleccionados === m
-                            ? 'bg-amber-600 text-white'
-                            : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-                        }`}
-                      >
-                        {m} mes{m > 1 ? 'es' : ''}
-                      </button>
-                    ))}
-                  </div>
-                  {servicioSeleccionado && (
-                    <p className="mt-2 text-xs text-amber-400 font-bold">
-                      💰 Total: ${precioTotal.toFixed(2)} (${servicioSeleccionado.precio.toFixed(2)} × {mesesSeleccionados} meses)
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* FECHA DE VENCIMIENTO MANUAL */}
-              {servicioSeleccionadoId && (
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-400 mb-2">
-                    📅 Fecha de Vencimiento <span className="text-amber-400">(opcional)</span>
+                    📅 Fecha de Vencimiento <span className="text-emerald-400">(OBLIGATORIO)</span>
                   </label>
                   <input
                     type="date"
@@ -295,14 +252,14 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
                     onChange={(e) => setFechaVencimientoManual(e.target.value)}
                     className="w-full bg-[#121212] text-white border border-zinc-700 rounded-lg px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
                   />
-                  <p className="text-xs text-zinc-500 mt-1">
-                    💡 Si la dejas vacía, se usará automáticamente: <span className="text-emerald-400 font-bold">{fechaQueSeUsara}</span>
+                  <p className="text-xs text-emerald-400 mt-1 font-bold">
+                    💡 Se calcularán automáticamente <strong>{mesesCalculados} Mes{mesesCalculados > 1 ? 'es' : ''}</strong> → Total: <strong>${precioTotal.toFixed(2)}</strong>
                   </p>
                 </div>
               )}
 
               {/* PASO 2: Elegir cuenta disponible */}
-              {servicioSeleccionadoId && (
+              {servicioSeleccionadoId && fechaVencimientoManual && (
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 mb-2">
                     🔑 Paso 2: Elige una cuenta disponible
@@ -356,13 +313,13 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
                 </div>
               )}
 
-              {/* ✅ RESUMEN — MUESTRA TODO CORRECTAMENTE */}
-              {cuentaSeleccionadaId && servicioSeleccionado && (
+              {/* ✅ RESUMEN ACTUALIZADO */}
+              {cuentaSeleccionadaId && servicioSeleccionado && fechaVencimientoManual && (
                 <div className="bg-emerald-950/30 border border-emerald-800/50 rounded-lg p-3 text-xs">
                   <p className="text-emerald-300">
-                    ✅ Se creará una orden por <strong>${precioTotal.toFixed(2)}</strong> ({mesesSeleccionados} mes{mesesSeleccionados > 1 ? 'es' : ''})
+                    ✅ Se creará una orden por <strong>${precioTotal.toFixed(2)}</strong> ({mesesCalculados} Mes{mesesCalculados > 1 ? 'es' : ''})
                     <br />
-                    📅 Vencimiento: <strong>{fechaQueSeUsara}</strong> {fechaVencimientoManual ? '(manual)' : '(automática)'}
+                    📅 Vencimiento: <strong>{fechaQueSeUsara}</strong>
                     <br />
                     📱 Al confirmar se abrirá <strong>WhatsApp</strong> con el mensaje listo para enviar
                     <br />
