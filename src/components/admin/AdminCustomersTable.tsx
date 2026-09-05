@@ -143,7 +143,7 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
     );
     setProcesando(false);
     if (exito) {
-      alert(`✅ Cuenta asignada correctamente a ${clienteSeleccionado.nombre}\n⏳ Duración: ${mesesCalculados} Mes${mesesCalculados > 1 ? 'es' : ''}\n💰 Total: $${precioTotal.toFixed(2)}\n📅 Vencimiento: ${fechaQueSeUsara}\n📱 WhatsApp abierto con el mensaje listo para enviar`);
+      alert(`✅ Cuenta asignada correctamente a ${clienteSeleccionado.nombre}\n⏳ Duración: ${mesesCalculados} Mes${mesesCalculados > 1 ? 'es' : ''}\n💰 Total: Bs ${precioTotal.toFixed(2)}\n📅 Vencimiento: ${fechaQueSeUsara}\n📱 WhatsApp abierto con el mensaje listo para enviar`);
       setModalAsignarAbierto(false);
       await cargarClientes();
     }
@@ -234,7 +234,7 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
                   <option value="">-- Selecciona un servicio --</option>
                   {servicios.map(s => (
                     <option key={s.id} value={s.id}>
-                      {s.nombre} - ${s.precio.toFixed(2)}/mes
+                      {s.nombre} - Bs {s.precio.toFixed(2)}/mes
                     </option>
                   ))}
                 </select>
@@ -253,7 +253,7 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
                     className="w-full bg-[#121212] text-white border border-zinc-700 rounded-lg px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
                   />
                   <p className="text-xs text-emerald-400 mt-1 font-bold">
-                    💡 Se calcularán automáticamente <strong>{mesesCalculados} Mes{mesesCalculados > 1 ? 'es' : ''}</strong> → Total: <strong>${precioTotal.toFixed(2)}</strong>
+                    💡 Se calcularán automáticamente <strong>{mesesCalculados} Mes{mesesCalculados > 1 ? 'es' : ''}</strong> → Total: <strong>Bs {precioTotal.toFixed(2)}</strong>
                   </p>
                 </div>
               )}
@@ -317,7 +317,7 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
               {cuentaSeleccionadaId && servicioSeleccionado && fechaVencimientoManual && (
                 <div className="bg-emerald-950/30 border border-emerald-800/50 rounded-lg p-3 text-xs">
                   <p className="text-emerald-300">
-                    ✅ Se creará una orden por <strong>${precioTotal.toFixed(2)}</strong> ({mesesCalculados} Mes{mesesCalculados > 1 ? 'es' : ''})
+                    ✅ Se creará una orden por <strong>Bs {precioTotal.toFixed(2)}</strong> ({mesesCalculados} Mes{mesesCalculados > 1 ? 'es' : ''})
                     <br />
                     📅 Vencimiento: <strong>{fechaQueSeUsara}</strong>
                     <br />
@@ -451,7 +451,7 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
                     </span>
                   </td>
                   <td className="py-3 px-4 font-semibold text-emerald-400">
-                    ${Number(cli.total_gastado || 0).toFixed(2)}
+                    Bs {Number(cli.total_gastado || 0).toFixed(2)}
                   </td>
                   <td className="py-3 px-4 font-mono text-xs text-amber-400 font-bold">
                     {cli.contrasena || 'Sin contraseña'}

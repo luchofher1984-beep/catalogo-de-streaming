@@ -11,7 +11,6 @@ import { EditServiceModal } from './EditServiceModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { LogoutModal } from './LogoutModal';
 import { AdminAllAccounts } from './AdminAllAccounts';
-
 // ✅ Importamos el servicio Y el cliente supabase directamente
 import { supabaseService, supabase } from '../../services/supabaseService';
 import {
@@ -224,33 +223,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       await supabaseService.aumentarTotalGastado(clienteId, precioTotal);
 
       // ═══════════════════════════════════════════════════════════
-      // ✅ MENSAJE WHATSAPP — CON MESES Y TOTAL CORRECTOS 💎
+      // ✅ MENSAJE WHATSAPP — CON Bs (Bolivianos) 💎
       // ═══════════════════════════════════════════════════════════
       const telefono = (cliente.telefono || '').replace(/\D/g, '');
       if (telefono) {
         const mensaje = encodeURIComponent(
 `✅ CUENTA ACTIVA — ${servicio.nombre}
-
 Cliente: ${cliente.nombre}
-
 📧 Correo: ${cuenta.usuario_correo}
 🔑 Contraseña: ${cuenta.contrasena}
 👤 Perfil: ${cuenta.perfil || 'No especificado'}
 📌 PIN: ${cuenta.pin || 'No especificado'}
-
 📅 Vence: ${fechaVencimientoStr}
 ⏳ Duración: ${etiquetaMeses}
-💰 Total: $${precioTotal.toFixed(2)}
-
+💰 Total: Bs ${precioTotal.toFixed(2)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 💡 No cambies la contraseña ni el PIN.
 ¡Gracias por tu compra! 🙌`
         );
+
         console.log('📱 MENSAJE WHATSAPP GENERADO:', {
           duracion: etiquetaMeses,
-          total: precioTotal.toFixed(2)
+          total: 'Bs ' + precioTotal.toFixed(2)
         });
+
         window.open(`https://wa.me/${telefono}?text=${mensaje}`, '_blank');
       } else {
         alert('⚠️ Cuenta asignada correctamente, pero el cliente no tiene teléfono registrado para enviar WhatsApp.');
