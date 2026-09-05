@@ -16,7 +16,6 @@ import {
   Hash,
 } from 'lucide-react';
 
-
 // 📋 Tipo para las cuentas
 interface CuentaServicio {
   id: string;
@@ -30,7 +29,6 @@ interface CuentaServicio {
   entregada_en?: string;
 }
 
-
 interface AdminServicesTableProps {
   servicios: ServicioStreaming[];
   todasLasCuentas: CuentaServicio[];
@@ -41,7 +39,6 @@ interface AdminServicesTableProps {
   onAbrirModalNuevoServicio: () => void;
   onRecargarTodasCuentas: () => Promise<void>;
 }
-
 
 export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
   servicios,
@@ -57,7 +54,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
   const [filtroCategoria, setFiltroCategoria] = useState<string>('todas');
   const [ordenarPor, setOrdenarPor] = useState<'nombre' | 'precio_asc' | 'precio_desc' | 'stock_asc' | 'stock_desc'>('stock_desc');
 
-
   // 🔑 ESTADOS PARA EL MODAL DE CUENTAS
   const [modalCuentasAbierto, setModalCuentasAbierto] = useState(false);
   const [servicioSeleccionado, setServicioSeleccionado] = useState<ServicioStreaming | null>(null);
@@ -69,10 +65,9 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
     contrasena: '',
     perfil: '',
     pin: '',
-    cantidad_perfiles: 1, // ✅ NUEVO: Cantidad de perfiles a crear
-    nombres_perfiles: ''  // ✅ NUEVO: Nombres separados por coma
+    cantidad_perfiles: 1,
+    nombres_perfiles: ''
   });
-
 
   // ==========================================
   // ✅ STOCK AUTOMÁTICO = CUENTAS DISPONIBLES
@@ -83,7 +78,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
     ).length;
   }, [todasLasCuentas]);
 
-
   // 📋 Cargar cuentas del servicio seleccionado
   const cargarCuentas = async (servicioId: string) => {
     setCargandoCuentas(true);
@@ -91,7 +85,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
     if (!error) setCuentas((data as CuentaServicio[]) || []);
     setCargandoCuentas(false);
   };
-
 
   // 📂 Abrir modal de cuentas
   const abrirModalCuentas = async (servicio: ServicioStreaming) => {
@@ -101,14 +94,12 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
     await cargarCuentas(servicio.id);
   };
 
-
   // ═══════════════════════════════════════════
   // ✅ AGREGAR CUENTA — SOPORTA MÚLTIPLES PERFILES
   // ═══════════════════════════════════════════
   const handleAgregarCuenta = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!servicioSeleccionado) return;
-
     const cantidad = Math.max(1, Number(nuevaCuenta.cantidad_perfiles) || 1);
     const nombresLista = nuevaCuenta.nombres_perfiles
       .split(',')
@@ -116,11 +107,9 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
       .filter(n => n.length > 0);
 
     let todoBien = true;
-
     // ✅ Crea 1 o VARIAS cuentas automáticamente (mismo correo, distinto perfil)
     for (let i = 0; i < cantidad; i++) {
       const perfilAsignado = nombresLista[i] || nuevaCuenta.perfil || `Perfil ${i + 1}`;
-
       const { error } = await supabaseService.agregarCuenta({
         servicio_id: servicioSeleccionado.id,
         usuario_correo: nuevaCuenta.usuario_correo,
@@ -128,7 +117,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
         perfil: perfilAsignado,
         pin: nuevaCuenta.pin || undefined
       });
-
       if (error) {
         console.error(`❌ Error al agregar cuenta ${i + 1}:`, error);
         todoBien = false;
@@ -156,7 +144,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
     }
   };
 
-
   // 🗑️ Eliminar cuenta → ACTUALIZA TODO AUTOMÁTICAMENTE ✅
   const handleEliminarCuenta = async (cuentaId: string) => {
     const { success, error } = await supabaseService.eliminarCuenta(cuentaId);
@@ -171,11 +158,9 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
     }
   };
 
-
   // Filtrado y ordenamiento con STOCK REAL
   const serviciosFiltrados = useMemo(() => {
     let list = [...servicios];
-
     if (busqueda.trim()) {
       const q = busqueda.toLowerCase();
       list = list.filter(
@@ -185,17 +170,14 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
           (s.tipo_cuenta && s.tipo_cuenta.toLowerCase().includes(q))
       );
     }
-
     if (filtroEstado === 'activos') {
       list = list.filter((s) => getStockDisponible(s.id) > 0);
     } else if (filtroEstado === 'agotados') {
       list = list.filter((s) => getStockDisponible(s.id) === 0);
     }
-
     if (filtroCategoria !== 'todas') {
       list = list.filter((s) => s.categoria === filtroCategoria);
     }
-
     list.sort((a, b) => {
       const stockA = getStockDisponible(a.id);
       const stockB = getStockDisponible(b.id);
@@ -206,16 +188,13 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
       if (ordenarPor === 'stock_desc') return stockB - stockA;
       return 0;
     });
-
     return list;
   }, [servicios, busqueda, filtroEstado, filtroCategoria, ordenarPor, getStockDisponible]);
-
 
   const totalActivos = servicios.filter((s) => getStockDisponible(s.id) > 0).length;
   const totalAgotados = servicios.filter((s) => getStockDisponible(s.id) === 0).length;
   const disponibles = cuentas.filter(c => c.estado === 'disponible').length;
   const entregadas = cuentas.filter(c => c.estado === 'entregada').length;
-
 
   return (
     <div className="space-y-4">
@@ -242,7 +221,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
             </button>
           )}
         </div>
-
         {/* ✅ BOTÓN AGREGAR NUEVO SERVICIO — SIEMPRE VISIBLE */}
         <button
           onClick={onAbrirModalNuevoServicio}
@@ -251,7 +229,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
           <Plus className="w-4 h-4" />
           Agregar Nuevo Servicio
         </button>
-
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex rounded-xl bg-[#121212] p-1 border border-zinc-800 text-xs font-semibold">
             <button
@@ -281,7 +258,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
               Agotados ({totalAgotados})
             </button>
           </div>
-
           <select
             value={filtroCategoria}
             onChange={(e) => setFiltroCategoria(e.target.value)}
@@ -294,7 +270,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
             <option value="deportes">Deportes en Vivo</option>
             <option value="combos">Combos Especiales</option>
           </select>
-
           <select
             value={ordenarPor}
             onChange={(e) => setOrdenarPor(e.target.value as any)}
@@ -309,7 +284,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
         </div>
       </div>
 
-
       {/* ═══════════════════════════════════════════
           TABLA DE SERVICIOS
           ═══════════════════════════════════════════ */}
@@ -320,19 +294,18 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
               <tr className="border-b border-zinc-800 bg-[#141414] text-[11px] uppercase tracking-wider text-zinc-400 font-bold">
                 <th className="py-4 px-4 sm:px-6 w-20 text-center">Logo</th>
                 <th className="py-4 px-4 sm:px-6">Nombre del Servicio</th>
-                <th className="py-4 px-4 sm:px-6">Precio (USD)</th>
+                {/* ✅ CAMBIADO: (USD) → (Bs) */}
+                <th className="py-4 px-4 sm:px-6">Precio (Bs)</th>
                 <th className="py-4 px-4 sm:px-6 text-center">Stock Disponible</th>
                 <th className="py-4 px-4 sm:px-6 text-center">Estado</th>
                 <th className="py-4 px-4 sm:px-6 text-right">Acciones</th>
               </tr>
             </thead>
-
             <tbody className="divide-y divide-zinc-800/80 text-xs sm:text-sm">
               {serviciosFiltrados.length > 0 ? (
                 serviciosFiltrados.map((servicio) => {
                   const stockReal = getStockDisponible(servicio.id);
                   const estaAgotado = stockReal === 0;
-
                   return (
                     <tr
                       key={servicio.id}
@@ -353,7 +326,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                           />
                         </div>
                       </td>
-
                       {/* Nombre */}
                       <td className="py-3.5 px-4 sm:px-6">
                         <div className="flex flex-col gap-1">
@@ -379,22 +351,20 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                           </div>
                         </div>
                       </td>
-
-                      {/* Precio */}
+                      {/* Precio — ✅ CAMBIADO: $ → Bs */}
                       <td className="py-3.5 px-4 sm:px-6 font-bold">
                         <div className="flex flex-col">
                           <span className="text-base text-white font-black">
-                            ${servicio.precio.toFixed(2)}
+                            Bs {servicio.precio.toFixed(2)}
                             <span className="text-xs text-zinc-500 font-normal ml-0.5">/mes</span>
                           </span>
                           {servicio.precio_original && (
                             <span className="text-[11px] text-zinc-500 line-through">
-                              ${servicio.precio_original.toFixed(2)}
+                              Bs {servicio.precio_original.toFixed(2)}
                             </span>
                           )}
                         </div>
                       </td>
-
                       {/* ✅ STOCK QUE SE ACTUALIZA SOLO */}
                       <td className="py-3.5 px-4 sm:px-6 text-center">
                         <div className="inline-flex flex-col items-center gap-1.5">
@@ -410,7 +380,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                           </span>
                         </div>
                       </td>
-
                       {/* Estado */}
                       <td className="py-3.5 px-4 sm:px-6 text-center">
                         {estaAgotado ? (
@@ -425,7 +394,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                           </span>
                         )}
                       </td>
-
                       {/* Acciones */}
                       <td className="py-3.5 px-4 sm:px-6 text-right">
                         <div className="flex items-center justify-end gap-1.5 flex-wrap">
@@ -438,7 +406,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                             <Key className="w-3.5 h-3.5" />
                             <span className="hidden sm:inline">Cuentas</span>
                           </button>
-
                           <button
                             onClick={() => onEditarServicio(servicio)}
                             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-blue-600 text-zinc-300 hover:text-white text-xs font-bold transition-all border border-zinc-700 hover:border-blue-500 shadow-sm cursor-pointer"
@@ -447,7 +414,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                             <Edit className="w-3.5 h-3.5" />
                             <span className="hidden sm:inline">Editar</span>
                           </button>
-
                           <button
                             onClick={() => onEliminarServicio(servicio)}
                             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-rose-600 text-zinc-400 hover:text-white text-xs font-bold transition-all border border-zinc-700 hover:border-rose-500 shadow-sm cursor-pointer"
@@ -456,7 +422,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                             <Trash2 className="w-3.5 h-3.5" />
                             <span className="hidden sm:inline">Eliminar</span>
                           </button>
-
                           <button
                             onClick={() => onVerServicioEnTienda(servicio)}
                             className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors border border-zinc-700"
@@ -492,7 +457,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
             </tbody>
           </table>
         </div>
-
         <div className="px-6 py-3.5 bg-[#141414] border-t border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-zinc-400">
           <div>Mostrando <strong className="text-white">{serviciosFiltrados.length}</strong> de <strong className="text-white">{servicios.length}</strong> servicios</div>
           <div className="flex items-center gap-4">
@@ -501,7 +465,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
           </div>
         </div>
       </div>
-
 
       {/* ═══════════════════════════════════════════
           🪟 MODAL: GESTIONAR CUENTAS (CON PERFILES MÚLTIPLES)
@@ -527,7 +490,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                 <X className="w-5 h-5" />
               </button>
             </div>
-
             <div className="p-6 space-y-6">
               {!formAgregarAbierto ? (
                 <button
@@ -558,7 +520,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                         className="w-full bg-[#121212] border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 focus:outline-none"
                       />
                     </div>
-
                     <div>
                       <label className="block text-xs font-semibold text-zinc-400 mb-1.5 flex items-center gap-1">
                         <Lock className="w-3 h-3" /> Contraseña *
@@ -572,7 +533,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                         className="w-full bg-[#121212] border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 focus:outline-none"
                       />
                     </div>
-
                     {/* ✅ NUEVO: Cantidad de perfiles */}
                     <div>
                       <label className="block text-xs font-semibold text-zinc-400 mb-1.5 flex items-center gap-1">
@@ -590,7 +550,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                       />
                       <p className="text-[10px] text-zinc-500 mt-1">Netflix = 5, Disney+ = 7, etc.</p>
                     </div>
-
                     {/* ✅ NUEVO: Nombres de perfiles */}
                     <div>
                       <label className="block text-xs font-semibold text-zinc-400 mb-1.5 flex items-center gap-1">
@@ -605,7 +564,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                       />
                       <p className="text-[10px] text-zinc-500 mt-1">Opcional. Si lo dejas vacío: Perfil 1, Perfil 2...</p>
                     </div>
-
                     <div>
                       <label className="block text-xs font-semibold text-zinc-400 mb-1.5 flex items-center gap-1">
                         <Hash className="w-3 h-3" /> PIN (si aplica)
@@ -619,12 +577,10 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                       />
                     </div>
                   </div>
-
                   {/* ✅ AVISO: cuántas cuentas se crearán */}
                   <div className="bg-amber-950/30 border border-amber-800/50 rounded-lg p-3 text-xs text-amber-300">
                     ⚡ Se crearán automáticamente <strong>{Math.max(1, Number(nuevaCuenta.cantidad_perfiles) || 1)}</strong> cuenta(s) con el mismo correo y contraseña.
                   </div>
-
                   <div className="flex gap-3 pt-2">
                     <button
                       type="button"
@@ -652,7 +608,6 @@ export const AdminServicesTable: React.FC<AdminServicesTableProps> = ({
                   </div>
                 </form>
               )}
-
               {/* Lista de cuentas */}
               <div className="space-y-2">
                 <h3 className="text-sm font-bold text-zinc-300">Lista de Cuentas</h3>
