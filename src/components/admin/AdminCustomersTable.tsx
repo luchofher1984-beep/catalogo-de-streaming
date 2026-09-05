@@ -145,8 +145,8 @@ export const AdminCustomersTable: React.FC<AdminCustomersTableProps> = ({
       clienteSeleccionado.id,
       cuentaSeleccionadaId,
       servicioSeleccionadoId,
-      mesesAEnviar,       // ← MESES GARANTIZADOS
-      fechaFinal          // ← FECHA SEPARADA
+      mesesAEnviar,        // ← MESES GARANTIZADOS
+      fechaFinal           // ← FECHA SEPARADA
     );
 
     setProcesando(false);
